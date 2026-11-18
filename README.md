@@ -94,7 +94,7 @@ Then build and run with **⌘R**. Run the tests with **⌘U**.
 EpochLifts/            iOS app (Views, ViewModels, Services, Persistence)
 EpochLiftsTests/       Unit tests
 EpochLiftsWatch/       watchOS app (planned)
-WorkoutCore/           Shared Swift package: models, RepEvent, rep detection (planned)
+WorkoutCore/           Shared Swift package: models, RepEvent, rep detection
 docs/                  Design notes and decision records
 ```
 

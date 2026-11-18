@@ -185,6 +185,21 @@ struct RepEvent: Sendable {
 
 **Limitations:** A single wrist sensor cannot assess full-body form, such as knee position.
 
+### ADR-012: iPhone only, iOS 17 minimum
+
+**Context:** The Xcode template targets iPhone, iPad, Mac and Vision Pro. Each extra platform adds layouts to test and APIs to check, and the motion features depend on an iPhone paired with an Apple Watch.
+
+**Decision:**
+- The app runs on iPhone only.
+- Minimum iOS 17.0, the earliest version that supports `@Observable` (ADR-009).
+- `WorkoutCore` supports iOS 17 and watchOS 10 (the matching Watch release). It also lists macOS 14 so its tests can run on a Mac without a simulator.
+
+**Alternatives:**
+- iPhone and iPad: little extra work for manual logging, but every screen needs a second layout. Can be added later.
+- iOS 18 or later: newer APIs without availability checks, but it excludes devices still on iOS 17.
+
+**Consequences:** APIs newer than iOS 17 need `if #available` checks. Adding iPad later means changing the target's device family and testing layouts; no architecture changes.
+
 ## 4. Testing
 
 - Layers are built bottom-up. Each step ends with passing tests and a commit.
@@ -216,3 +231,4 @@ V0.2 (Apple Watch): watchOS app, workout session and motion recording, file tran
 | 2026-11 | Removed camera-based tracking (former ADR-012) and AI coaching from scope. |
 | 2026-11 | Reformatted: statuses written as text, wording tightened. No decisions changed. |
 | 2026-11 | Accepted ADR-003 (rep events carry metrics), ADR-007 (replay counter), ADR-010 (stable exercise IDs, SI units) and ADR-011 (signal processing for counting, ML for quality). |
+| 2026-11 | Added ADR-012: iPhone only, iOS 17 minimum, `WorkoutCore` on iOS 17 and watchOS 10. |
