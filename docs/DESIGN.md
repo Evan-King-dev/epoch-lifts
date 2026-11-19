@@ -158,11 +158,15 @@ struct RepEvent: Sendable {
 - Swift 6 language mode with strict concurrency from the start. Sensor callbacks, Watch messages and UI updates run on different threads, and the compiler catches data races. Enabling it later in a larger codebase is costly.
 - `AsyncStream` for rep events instead of Combine. It fits Swift concurrency and wraps callback-based APIs easily.
 
-### ADR-010: Stable exercise IDs and SI units
+### ADR-010: Stable exercise IDs and units
 
 **Decision:**
-- Built-in exercises are defined in `Exercise.defaults` with fixed string IDs such as `"bench-press"`. IDs generated at launch would break history grouping and per-exercise ML templates.
-- Stored values use SI units (kg, seconds, m/s²). Values are converted to pounds only for display.
+- Built-in exercises are defined in `ExerciseType.defaults` with fixed string IDs such as `"bench-press"`. IDs generated at launch would break history grouping and per-exercise ML templates.
+- Weights are stored in pounds, exactly as entered (`weightLb`). Local gyms use pound plates, and storing kilograms would turn entered values like 225 lb into 102.058… kg, with rounding errors when converted back for display.
+- Physics and ML code that needs kilograms converts with a single `weightKg` property (`weightLb × 0.45359237`), added when first needed in V0.3. Rep detection does not use weight.
+- Time and sensor data use SI units (seconds, m/s²).
+
+**Alternatives:** Store kilograms and convert to pounds for input and display (the original version of this decision). Rejected because every input and display would need conversion and rounding.
 
 ### ADR-011: Signal processing for counting, ML for quality
 
@@ -185,7 +189,7 @@ struct RepEvent: Sendable {
 
 **Limitations:** A single wrist sensor cannot assess full-body form, such as knee position.
 
-### ADR-012: iPhone only, iOS 17 minimum
+### ADR-013: iPhone only, iOS 17 minimum
 
 **Context:** The Xcode template targets iPhone, iPad, Mac and Vision Pro. Each extra platform adds layouts to test and APIs to check, and the motion features depend on an iPhone paired with an Apple Watch.
 
@@ -199,6 +203,50 @@ struct RepEvent: Sendable {
 - iOS 18 or later: newer APIs without availability checks, but it excludes devices still on iOS 17.
 
 **Consequences:** APIs newer than iOS 17 need `if #available` checks. Adding iPad later means changing the target's device family and testing layouts; no architecture changes.
+
+### ADR-014: Workout data model
+
+**Context:** The first models define the saved JSON format, which every later version must still decode (ADR-008). They live in `WorkoutCore` so the Watch app can use them.
+
+**Decision:**
+
+```
+Workout          id, startedAt, endedAt?, exercises: [LoggedExercise]
+LoggedExercise   id, exercise: ExerciseType, sets: [LoggedSet]
+LoggedSet        id, reps, weightLb, completedAt, repSource: RepCountSource
+ExerciseType     id (stable string), name
+RepCountSource   manual | watch | replay
+```
+
+How they nest:
+
+```
+Workout                              one gym visit
+└─ exercises: [LoggedExercise]       each exercise you did in it
+   ├─ exercise: ExerciseType         which exercise (copied from the catalogue)
+   └─ sets: [LoggedSet]              the sets you did
+      └─ repSource: RepCountSource   manual, watch or replay
+```
+
+- "Logged…" types are what you actually did; `ExerciseType` is the catalogue entry. `RepCountSource` says where a set's rep count came from. Per-rep data (`RepMetrics`, ADR-003) is a separate, later field on `LoggedSet`, not a replacement for it.
+- Source files stay in one flat `Models/` folder; the tree above (also in the doc comment on `Workout`) shows how they relate.
+
+- Models are structs (or enums for fixed value sets). Each protocol is added for a reason:
+  - `Codable`: saved, or contained in something saved. Required all the way down, since a type only encodes if its properties do.
+  - `Hashable`: needs `==` (e.g. tests), or is contained in a `Hashable` type. Also required all the way down.
+  - `Sendable`: every public type in `WorkoutCore`. Swift does not infer it across module boundaries, and Swift 6 needs it to pass values between actors.
+  - `Identifiable`: only types shown as their own item in a list or `ForEach`, or that need a stable identity. `Workout`, `LoggedExercise`, `LoggedSet` and `ExerciseType` have it; `RepCountSource` does not.
+- A `LoggedExercise` stores a copy of its `ExerciseType`, so history keeps the name even if the catalogue changes, and views need no lookup.
+- `weightLb` of 0 means bodyweight.
+- `Workout.endedAt` is nil while the workout is in progress. `isActive` and `totalSets` are computed. `duration(now:)` takes the current time as a parameter so it can be tested.
+- Workouts, sessions and sets use UUIDs generated once at creation. Only catalogue exercises need stable IDs (ADR-010).
+- Not included yet: recording IDs, rep metrics, custom exercises. Each will be added as an optional field or a separate feature when needed.
+
+**Alternatives:**
+- Store only `exerciseID` in a session: smaller, but every view would need the catalogue to show a name.
+- Optional weight with nil for bodyweight: more precise, but adds nil handling everywhere for little benefit.
+
+**Consequences:** The saved format follows these types directly. `schemaVersion` belongs to the file wrapper added with persistence (step 2), not to the models.
 
 ## 4. Testing
 
@@ -231,4 +279,8 @@ V0.2 (Apple Watch): watchOS app, workout session and motion recording, file tran
 | 2026-11 | Removed camera-based tracking (former ADR-012) and AI coaching from scope. |
 | 2026-11 | Reformatted: statuses written as text, wording tightened. No decisions changed. |
 | 2026-11 | Accepted ADR-003 (rep events carry metrics), ADR-007 (replay counter), ADR-010 (stable exercise IDs, SI units) and ADR-011 (signal processing for counting, ML for quality). |
-| 2026-11 | Added ADR-012: iPhone only, iOS 17 minimum, `WorkoutCore` on iOS 17 and watchOS 10. |
+| 2026-11 | Added ADR-013: iPhone only, iOS 17 minimum, `WorkoutCore` on iOS 17 and watchOS 10 (first committed as ADR-012; renumbered because that number belonged to the removed camera decision). |
+| 2026-11 | Changed ADR-010: weights stored in pounds as entered, converted to kg only for physics. Time and sensor data stay SI. Added ADR-014: workout data model. |
+| 2026-11 | Clarified ADR-014: when a model gets `Codable`, `Hashable`, `Sendable` and `Identifiable`. No models changed. |
+| 2026-11 | Renamed the catalogue model `Exercise` to `ExerciseType` (ADR-010, ADR-014) so it reads clearly next to `ExerciseSession` (now `LoggedExercise`). The `exercise` property and saved JSON keys are unchanged. |
+| 2026-11 | Renamed `ExerciseSession` to `LoggedExercise` and `WorkoutSet` to `LoggedSet` (ADR-014), added a model tree. Kept `RepCountSource`; `RepMetrics` stays a later, separate field. Flat `Models/` folder. Saved JSON keys unchanged. |

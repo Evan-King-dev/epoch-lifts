@@ -10,8 +10,9 @@ import WorkoutCore
 
 struct EpochLiftsTests {
 
+    /// Checks the app target can see WorkoutCore's public types.
     @Test func workoutCoreIsLinked() {
-        #expect(workoutCoreVersion == "0.1.0")
+        #expect(!ExerciseType.defaults.isEmpty)
     }
 
 }

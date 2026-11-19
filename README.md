@@ -58,7 +58,7 @@ Full reasoning for each design choice: **[docs/DESIGN.md](docs/DESIGN.md)**
 - **Swift 6**, **SwiftUI**, Swift Concurrency (`async`/`await`, `AsyncStream`)
 - **watchOS**, **CoreMotion**, **HealthKit** (`HKWorkoutSession`), **WatchConnectivity**: *planned*
 - **Core ML**, **Create ML**; Python + scikit-learn for model prototyping: *planned*
-- **XCTest** unit tests; GitHub Actions CI: *planned*
+- **Swift Testing** unit tests; GitHub Actions CI: *planned*
 - Persistence: Codable JSON file store behind a repository protocol (SwiftData migration planned)
 
 ---

@@ -2,6 +2,8 @@
 
 import PackageDescription
 
+/// WorkoutCore: code shared by the iOS and watchOS apps (models, RepEvent, rep detection).
+/// Why it's a separate package: see ADR-006 in docs/DESIGN.md.
 let package = Package(
     name: "WorkoutCore",
     platforms: [
