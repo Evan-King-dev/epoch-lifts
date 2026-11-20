@@ -137,17 +137,21 @@ struct RepEvent: Sendable {
 - Regression tests check that a given recording produces the expected rep count, so detection changes that break counting fail a test.
 - The app can be demonstrated without a Watch.
 
-### ADR-008: Repository protocol with JSON file storage
+### ADR-008: Workout storage protocol with a JSON file
 
 **Context:** The first version stored workouts as JSON in `UserDefaults`, which is intended for small settings. Workout history grows without limit.
 
-**Decision:** A `WorkoutRepository` protocol with two implementations: a JSON file in the app's Documents folder, and an in-memory store for tests and previews.
+**Decision:** A `WorkoutStorage` protocol with two implementations: `FileWorkoutStorage`, a JSON file in the app's Documents folder, and `InMemoryWorkoutStorage` for tests and previews.
 
 **Rules:**
-- The saved file includes a `schemaVersion` so older formats can be migrated.
+- The saved file includes a `formatVersion` so older formats can be migrated.
 - New model fields are optional so older files still decode.
 - Decode failures are logged. Saved history is never replaced with an empty list.
 - Raw sensor recordings are separate files referenced by ID, not stored in the workout JSON.
+- The storage code lives in `WorkoutCore`, so its tests run on the Mac with `swift test` and the Watch can reuse it.
+- The API is synchronous (`loadWorkouts() throws`, `saveWorkouts(_:) throws`) and saves the whole history at once. The file is small, so this is fast enough on the main thread. If the history grows large, the protocol becomes `async`.
+- A missing file loads as an empty list. A corrupt file, or one with a newer `formatVersion`, throws and is left untouched.
+- Saves are atomic: the file is written in full to a temporary location, then swapped in.
 
 **Consequences:** A later move to SwiftData is a new implementation of the same protocol.
 
@@ -246,12 +250,12 @@ Workout                              one gym visit
 - Store only `exerciseID` in a session: smaller, but every view would need the catalogue to show a name.
 - Optional weight with nil for bodyweight: more precise, but adds nil handling everywhere for little benefit.
 
-**Consequences:** The saved format follows these types directly. `schemaVersion` belongs to the file wrapper added with persistence (step 2), not to the models.
+**Consequences:** The saved format follows these types directly. `formatVersion` belongs to the file wrapper added with persistence (step 2), not to the models.
 
 ## 4. Testing
 
 - Layers are built bottom-up. Each step ends with passing tests and a commit.
-- ViewModels are tested with a fake rep counter and the in-memory repository.
+- ViewModels are tested with a fake rep counter and `InMemoryWorkoutStorage`.
 - Persistence is tested by saving and reloading data.
 - Rep detection is tested against recorded motion files using the replay counter.
 - CI runs the tests on every push.
@@ -284,3 +288,6 @@ V0.2 (Apple Watch): watchOS app, workout session and motion recording, file tran
 | 2026-11 | Clarified ADR-014: when a model gets `Codable`, `Hashable`, `Sendable` and `Identifiable`. No models changed. |
 | 2026-11 | Renamed the catalogue model `Exercise` to `ExerciseType` (ADR-010, ADR-014) so it reads clearly next to `ExerciseSession` (now `LoggedExercise`). The `exercise` property and saved JSON keys are unchanged. |
 | 2026-11 | Renamed `ExerciseSession` to `LoggedExercise` and `WorkoutSet` to `LoggedSet` (ADR-014), added a model tree. Kept `RepCountSource`; `RepMetrics` stays a later, separate field. Flat `Models/` folder. Saved JSON keys unchanged. |
+| 2026-11 | Extended ADR-008: repository lives in `WorkoutCore`, synchronous whole-file API, missing file loads empty, corrupt or newer files throw and are left untouched, atomic saves. |
+| 2026-11 | Renamed the saved file's `schemaVersion` to `formatVersion` (ADR-008, ADR-014). No files had been saved yet, so no migration is needed. |
+| 2026-11 | Renamed the persistence types to plain names (ADR-008): `WorkoutRepository` → `WorkoutStorage`, `JSONFileWorkoutRepository` → `FileWorkoutStorage`, `InMemoryWorkoutRepository` → `InMemoryWorkoutStorage`, `WorkoutRepositoryError` → `WorkoutStorageError`; `load()`/`save(_:)` → `loadWorkouts()`/`saveWorkouts(_:)`. Saved file format unchanged. |
