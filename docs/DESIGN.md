@@ -58,18 +58,25 @@ Dependencies point one way. Models do not know about services, services do not k
 **Decision:** Every source implements `RepCountingService`:
 
 ```swift
+@MainActor
 protocol RepCountingService: AnyObject {
+    var count: Int { get }       // current count, never negative
     var repEvents: AsyncStream<RepEvent> { get }
     var sourceType: RepCountSource { get }
     func startCounting()
     func stopCounting()
     func reset()
-    func adjust(by delta: Int)   // user correction, for any source
+    func correctCount(to reps: Int)   // user correction after the set, for any source
 }
 ```
 
-- `adjust(by:)` is part of the protocol because sensors can miscount. Users can correct any source, and the ViewModel never casts to a concrete counter.
+- `correctCount(to:)` is part of the protocol because sensors can miscount. Users can correct any source, and the ViewModel never casts to a concrete counter.
 - `completeSet` takes no rep count. It reads the count from the active counter.
+- `count` lets `completeSet` read the count directly instead of tracking the last event. `correctCount(to:)` treats negative numbers as 0.
+- The protocol is `@MainActor`, like the ViewModel, so counters need no locks. Sources that get data on other threads (the Watch) switch to the main actor before updating.
+- Every change to `count` (a rep, a correction, a reset) sends a `RepEvent`.
+- Reps are entered or corrected only after the set, in a number box, so the user never touches the phone mid-set. `correctCount(to:)` takes the typed number rather than a +/- difference, so a late sensor event can't shift the saved count away from what the user typed. Corrections are meant for after `stopCounting()`.
+- `ManualRepCounter` is the no-sensor source: used without a Watch, for exercises the wrist can't count, or when the Watch disconnects.
 
 **Consequences:** Adding a source means writing one class and changing one line in the composition root.
 
@@ -85,6 +92,8 @@ struct RepEvent: Sendable {
     let metrics: RepMetrics?   // nil for manual input
 }
 ```
+
+`RepMetrics` is an empty placeholder until motion sources add its fields in V0.2.
 
 **Consequences:** The protocol is the most expensive part of the design to change, since every source and the ViewModel depend on it. Including metrics now avoids a later breaking change.
 
@@ -291,3 +300,5 @@ V0.2 (Apple Watch): watchOS app, workout session and motion recording, file tran
 | 2026-11 | Extended ADR-008: repository lives in `WorkoutCore`, synchronous whole-file API, missing file loads empty, corrupt or newer files throw and are left untouched, atomic saves. |
 | 2026-11 | Renamed the saved file's `schemaVersion` to `formatVersion` (ADR-008, ADR-014). No files had been saved yet, so no migration is needed. |
 | 2026-11 | Renamed the persistence types to plain names (ADR-008): `WorkoutRepository` → `WorkoutStorage`, `JSONFileWorkoutRepository` → `FileWorkoutStorage`, `InMemoryWorkoutRepository` → `InMemoryWorkoutStorage`, `WorkoutRepositoryError` → `WorkoutStorageError`; `load()`/`save(_:)` → `loadWorkouts()`/`saveWorkouts(_:)`. Saved file format unchanged. |
+| 2026-11 | Extended ADR-002: `RepCountingService` is `@MainActor` and has a `count` property; every count change sends a `RepEvent`. ADR-003: `RepMetrics` is an empty placeholder until V0.2. |
+| 2026-11 | Changed ADR-002: `adjust(by:)` replaced by `correctCount(to:)`. Reps are entered only after the set, in a number box. |
