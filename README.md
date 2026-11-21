@@ -76,7 +76,10 @@ git clone https://github.com/Evan-King-dev/epoch-lifts.git
 cd epoch-lifts
 open EpochLifts.xcodeproj
 ```
-Then build and run with **⌘R**. Run the tests with **⌘U**.
+Then build and run with **⌘R**. Run the app tests with **⌘U**. The `WorkoutCore` package tests run separately on the Mac:
+```bash
+cd WorkoutCore && swift test
+```
 
 ---
 
@@ -91,10 +94,10 @@ Then build and run with **⌘R**. Run the tests with **⌘U**.
 ## Project structure
 
 ```
-EpochLifts/            iOS app (Views, ViewModels, Services, Persistence)
-EpochLiftsTests/       Unit tests
+EpochLifts/            iOS app: views and ViewModels
+EpochLiftsTests/       ViewModel tests (run in the iOS simulator)
 EpochLiftsWatch/       watchOS app (planned)
-WorkoutCore/           Shared Swift package: models, RepEvent, rep detection
+WorkoutCore/           Shared Swift package: models, persistence, rep counting, input parsing; rep detection (planned)
 docs/                  Design notes and decision records
 ```
 

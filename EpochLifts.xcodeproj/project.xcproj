@@ -19,7 +19,6 @@
   "files": [
     { "kind": "folder", "path": "EpochLifts", "target-membership": [ "EpochLifts" ] },
     { "kind": "folder", "path": "EpochLiftsTests", "target-membership": [ "EpochLiftsTests" ] },
-    { "kind": "group", "name": "Frameworks" },
     {
       "kind": "group",
       "name": "Products",

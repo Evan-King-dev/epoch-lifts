@@ -261,6 +261,19 @@ Workout                              one gym visit
 
 **Consequences:** The saved format follows these types directly. `formatVersion` belongs to the file wrapper added with persistence (step 2), not to the models.
 
+### ADR-015: Workout ViewModel and set input
+
+**Decision:**
+- `WorkoutViewModel` lives in the app target: it is iPhone screen state, and the Watch will have its own. Pure logic it uses, such as `SetInput` (parsing the weight and reps boxes), lives in `WorkoutCore` so it is tested with `swift test`.
+- Set flow: `beginSet` → `finishSet` → `completeSet` or `cancelSet`. The reps box is plain text until Done; `completeSet` passes it to `correctCount(to:)` and saves the counter's `count` (ADR-002). No separate `correctReps`.
+- Validation: weight is 0 or more (0 = bodyweight); reps are a whole number of 1 or more.
+- Pre-fill from the previous set of the same exercise in this workout: weight always, reps only when the counter reads 0, so a sensor count is never replaced.
+- After a failed load, saving is off for the session (ADR-008).
+
+**Alternatives:** ViewModel in `WorkoutCore` (faster tests, but iPhone state in the shared package and `public` everywhere); no pre-fill (simpler, but most sets repeat the last one).
+
+**Consequences:** ViewModel tests need the simulator. Reading `repEvents` live waits for the Watch counter in V0.2.
+
 ## 4. Testing
 
 - Layers are built bottom-up. Each step ends with passing tests and a commit.
@@ -282,23 +295,3 @@ Workout                              one gym visit
 8. Device testing and TestFlight
 
 V0.2 (Apple Watch): watchOS app, workout session and motion recording, file transfer, replay counter, rep detection, live rep events on the iPhone, range-of-motion validation.
-
-## 6. Changelog
-
-| Date | Change |
-|---|---|
-| 2026-11 | Initial design. V0.1 restarted with a test-first architecture; Apple Watch chosen as the motion sensor. |
-| 2026-11 | Accepted ADR-006 (`WorkoutCore` package), ADR-008 (JSON file storage) and ADR-009 (`@Observable`, Swift 6, `AsyncStream`). |
-| 2026-11 | Removed camera-based tracking (former ADR-012) and AI coaching from scope. |
-| 2026-11 | Reformatted: statuses written as text, wording tightened. No decisions changed. |
-| 2026-11 | Accepted ADR-003 (rep events carry metrics), ADR-007 (replay counter), ADR-010 (stable exercise IDs, SI units) and ADR-011 (signal processing for counting, ML for quality). |
-| 2026-11 | Added ADR-013: iPhone only, iOS 17 minimum, `WorkoutCore` on iOS 17 and watchOS 10 (first committed as ADR-012; renumbered because that number belonged to the removed camera decision). |
-| 2026-11 | Changed ADR-010: weights stored in pounds as entered, converted to kg only for physics. Time and sensor data stay SI. Added ADR-014: workout data model. |
-| 2026-11 | Clarified ADR-014: when a model gets `Codable`, `Hashable`, `Sendable` and `Identifiable`. No models changed. |
-| 2026-11 | Renamed the catalogue model `Exercise` to `ExerciseType` (ADR-010, ADR-014) so it reads clearly next to `ExerciseSession` (now `LoggedExercise`). The `exercise` property and saved JSON keys are unchanged. |
-| 2026-11 | Renamed `ExerciseSession` to `LoggedExercise` and `WorkoutSet` to `LoggedSet` (ADR-014), added a model tree. Kept `RepCountSource`; `RepMetrics` stays a later, separate field. Flat `Models/` folder. Saved JSON keys unchanged. |
-| 2026-11 | Extended ADR-008: repository lives in `WorkoutCore`, synchronous whole-file API, missing file loads empty, corrupt or newer files throw and are left untouched, atomic saves. |
-| 2026-11 | Renamed the saved file's `schemaVersion` to `formatVersion` (ADR-008, ADR-014). No files had been saved yet, so no migration is needed. |
-| 2026-11 | Renamed the persistence types to plain names (ADR-008): `WorkoutRepository` → `WorkoutStorage`, `JSONFileWorkoutRepository` → `FileWorkoutStorage`, `InMemoryWorkoutRepository` → `InMemoryWorkoutStorage`, `WorkoutRepositoryError` → `WorkoutStorageError`; `load()`/`save(_:)` → `loadWorkouts()`/`saveWorkouts(_:)`. Saved file format unchanged. |
-| 2026-11 | Extended ADR-002: `RepCountingService` is `@MainActor` and has a `count` property; every count change sends a `RepEvent`. ADR-003: `RepMetrics` is an empty placeholder until V0.2. |
-| 2026-11 | Changed ADR-002: `adjust(by:)` replaced by `correctCount(to:)`. Reps are entered only after the set, in a number box. |
