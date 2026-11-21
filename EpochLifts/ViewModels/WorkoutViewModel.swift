@@ -52,6 +52,16 @@ final class WorkoutViewModel {
         activeWorkoutIndex.map { workouts[$0] }
     }
 
+    /// True when no workout is in progress, so a new one can be started.
+    var canStartWorkout: Bool {
+        activeWorkoutIndex == nil
+    }
+
+    /// Ended workouts, newest first, for the history list.
+    var pastWorkouts: [Workout] {
+        workouts.filter { !$0.isActive }.sorted { $0.startedAt > $1.startedAt }
+    }
+
     private let storage: any WorkoutStorage
     private let repCounter: any RepCountingService
     private let now: () -> Date

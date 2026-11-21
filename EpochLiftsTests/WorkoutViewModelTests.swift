@@ -91,6 +91,31 @@ struct WorkoutViewModelTests {
         #expect(viewModel.workouts.count == 1)
     }
 
+    @Test func canStartWorkoutOnlyWhenNoneIsActive() {
+        let viewModel = makeViewModel()
+        #expect(viewModel.canStartWorkout)
+
+        viewModel.startWorkout()
+        #expect(!viewModel.canStartWorkout)
+
+        viewModel.endWorkout()
+        #expect(viewModel.canStartWorkout)
+    }
+
+    @Test func pastWorkoutsAreEndedOnesNewestFirst() {
+        let older = Workout(startedAt: fixedDate, endedAt: fixedDate.addingTimeInterval(3600))
+        let newer = Workout(
+            startedAt: fixedDate.addingTimeInterval(86_400),
+            endedAt: fixedDate.addingTimeInterval(90_000)
+        )
+        let active = Workout(startedAt: fixedDate.addingTimeInterval(172_800))
+        let storage = InMemoryWorkoutStorage(workouts: [older, newer, active])
+
+        let viewModel = makeViewModel(storage: storage)
+
+        #expect(viewModel.pastWorkouts.map(\.id) == [newer.id, older.id])
+    }
+
     @Test func endWorkoutSetsEndDateAndSaves() throws {
         let storage = InMemoryWorkoutStorage()
         let viewModel = makeViewModel(storage: storage)
