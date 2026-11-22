@@ -48,13 +48,23 @@ struct ManualRepCounterTests {
         var events = counter.repEvents.makeAsyncIterator()
 
         counter.correctCount(to: 3)
-        counter.correctCount(to: -1)
-        counter.correctCount(to: 10)
-        counter.reset()
-
         #expect(await events.next() == RepEvent(count: 3))
+        counter.correctCount(to: -1)
         #expect(await events.next() == RepEvent(count: 0))
+        counter.correctCount(to: 10)
         #expect(await events.next() == RepEvent(count: 10))
+        counter.reset()
         #expect(await events.next() == RepEvent(count: 0))
+    }
+
+    @Test func unreadEventsKeepOnlyTheNewest() async {
+        let counter = ManualRepCounter()
+
+        counter.correctCount(to: 3)
+        counter.reset()
+        counter.correctCount(to: 8)
+
+        var events = counter.repEvents.makeAsyncIterator()
+        #expect(await events.next() == RepEvent(count: 8))
     }
 }

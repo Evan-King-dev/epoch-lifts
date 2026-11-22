@@ -22,7 +22,7 @@ Epoch Lifts is mainly a learning project covering: a thorough exploration of Swi
 | Range-of-motion validation (partial reps don't count) | Planned (V0.2) |
 | Raw motion recording + replay for testing and ML datasets | Planned (V0.2) |
 | Per-rep feedback: tempo, consistency, velocity loss / fatigue | Planned (V0.3) |
-| ML rep-quality models trained on recorded motion data | Planned (V0.3) |
+| Personal ML rep-quality models trained on my own motion data (may expand to more lifters later) | Planned (V0.3) |
 
 ---
 
@@ -37,7 +37,7 @@ Views  →  ViewModels  →  Services / Persistence  →  Models
 - **MVVM**, with dependencies pointing one way only. ViewModels never import SwiftUI.
 - **Every rep source implements one protocol**, `RepCountingService`, and emits `RepEvent`s:
   `ManualRepCounter` · `WatchRepCounter` · `ReplayRepCounter` · test fakes
-- **Composition root:** all real implementations are wired together in one place, so swapping a data source or storage backend is a one-line change.
+- **Composition root:** all real implementations are wired together in one place, so a new rep source or storage backend needs no changes to views or ViewModels.
 - **Shared Swift package (`WorkoutCore`)** holds the models and rep-detection code used by both the iOS and watchOS apps.
 - **Edge processing on the Watch:** rep detection runs on the Watch and sends small `RepEvent`s to the phone live. The raw ~100 Hz motion recording transfers after each set.
 
@@ -87,7 +87,7 @@ cd WorkoutCore && swift test
 
 - **V0.1**: Manual tracking rebuilt with tests, clean architecture, CI, TestFlight
 - **V0.2**: Apple Watch app: motion recording, rep detection, live rep counts on iPhone, ROM validation
-- **V0.3**: Per-rep feedback and ML rep-quality models trained on recorded motion data
+- **V0.3**: Per-rep feedback and personal ML rep-quality models trained on my own motion data
 
 ---
 

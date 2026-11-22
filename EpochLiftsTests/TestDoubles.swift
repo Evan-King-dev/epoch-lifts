@@ -46,7 +46,8 @@ final class FailingWorkoutStorage: WorkoutStorage {
     struct StorageFailure: Error {}
 
     let loadFails: Bool
-    let saveFails: Bool
+    /// Settable so a test can make one save fail and the next succeed.
+    var saveFails: Bool
     private(set) var saveCallCount = 0
 
     init(loadFails: Bool = false, saveFails: Bool = false) {

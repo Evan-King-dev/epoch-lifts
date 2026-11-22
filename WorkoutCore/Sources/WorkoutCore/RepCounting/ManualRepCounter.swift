@@ -9,8 +9,14 @@ public final class ManualRepCounter: RepCountingService {
 
     private let continuation: AsyncStream<RepEvent>.Continuation
 
+    /// Keeps only the newest unread event. Each event carries the full count and manual
+    /// events have no metrics, so older unread events are safe to drop, and a reader that
+    /// starts late never receives events from earlier sets.
     public init() {
-        (repEvents, continuation) = AsyncStream.makeStream(of: RepEvent.self)
+        (repEvents, continuation) = AsyncStream.makeStream(
+            of: RepEvent.self,
+            bufferingPolicy: .bufferingNewest(1)
+        )
     }
 
     deinit {
@@ -18,7 +24,7 @@ public final class ManualRepCounter: RepCountingService {
     }
 
     // `startCounting()` and `stopCounting()` are required by `RepCountingService` so the
-    // ViewModel can call them on every counter without knowing its type (ADR-002).
+    // ViewModel can call them on every counter without knowing its type (ADR-009).
     // Sensor counters use them to start and stop motion updates; manual counting has
     // no sensor, so they do nothing here.
 

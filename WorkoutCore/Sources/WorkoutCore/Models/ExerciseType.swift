@@ -2,7 +2,7 @@
 /// `LoggedExercise` holds a copy of one.
 public struct ExerciseType: Codable, Hashable, Identifiable, Sendable {
     /// Stable ID such as `"bench-press"`. Never generated at launch, so saved history and
-    /// per-exercise data always refer to the same exercise (ADR-010).
+    /// per-exercise data always refer to the same exercise (ADR-006).
     public let id: String
 
     /// Name shown in the UI, e.g. "Bench Press".

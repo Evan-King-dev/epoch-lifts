@@ -5,6 +5,6 @@ public enum RepCountSource: String, Codable, Hashable, Sendable {
     case manual
     /// Counted by the Apple Watch (V0.2).
     case watch
-    /// Replayed from a recorded motion file (ADR-007).
+    /// Replayed from a recorded motion file (ADR-013).
     case replay
 }

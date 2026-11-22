@@ -8,7 +8,7 @@ public struct LoggedSet: Codable, Hashable, Identifiable, Sendable {
     /// Number of reps, read from the active rep counter when the set is completed.
     public var reps: Int
 
-    /// Weight in pounds, exactly as entered (ADR-010). 0 means bodyweight.
+    /// Weight in pounds, exactly as entered (ADR-006). 0 means bodyweight.
     public var weightLb: Double
 
     /// When the set was completed.

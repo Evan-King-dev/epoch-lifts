@@ -4,7 +4,7 @@ import Foundation
 public struct LoggedExercise: Codable, Hashable, Identifiable, Sendable {
     public let id: UUID
 
-    /// A copy of the exercise, so history keeps its name even if the catalogue changes (ADR-014).
+    /// A copy of the exercise, so history keeps its name even if the catalogue changes (ADR-007).
     public var exercise: ExerciseType
 
     /// Sets in the order they were completed.

@@ -2,7 +2,7 @@ import SwiftUI
 import WorkoutCore
 
 /// The rows for logging a set of one exercise: start the set, finish it, then check weight
-/// and reps and save (ADR-015). Shows nothing while another exercise's set is in progress.
+/// and reps and save (ADR-011). Shows nothing while another exercise's set is in progress.
 struct LogSetView: View {
     @Bindable var viewModel: WorkoutViewModel
     let exerciseID: UUID

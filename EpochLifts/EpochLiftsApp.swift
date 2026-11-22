@@ -12,7 +12,7 @@ import WorkoutCore
         }
     }
 
-    /// Builds the ViewModel with file storage and manual rep counting (ADR-002, ADR-008).
+    /// Builds the ViewModel with file storage and manual rep counting (ADR-009, ADR-008).
     ///
     /// - Parameter documentsFolder: The folder that holds `workouts.json`. Tests pass a
     ///   temporary folder. Changing the file name would hide existing history.

@@ -1,6 +1,6 @@
 import Foundation
 
-/// A total workout: from pressing Start to pressing End.
+/// One gym visit: from pressing Start to pressing End.
 public struct Workout: Codable, Hashable, Identifiable, Sendable {
     public let id: UUID
 

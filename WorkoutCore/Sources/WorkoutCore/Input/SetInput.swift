@@ -1,7 +1,7 @@
 import Foundation
 
 /// Converts the text typed into a set's weight and reps boxes into numbers, and weights back
-/// into text for pre-filling the weight box (ADR-015).
+/// into text for pre-filling the weight box (ADR-011).
 ///
 /// Example: `SetInput.weightLb(from: "22.5")` returns `22.5`; `SetInput.reps(from: "0")` returns `nil`.
 public enum SetInput {

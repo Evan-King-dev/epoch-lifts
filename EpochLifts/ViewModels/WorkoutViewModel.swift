@@ -4,7 +4,7 @@ import os
 import WorkoutCore
 
 /// Screen state and actions for logging workouts: starting and ending a workout, adding
-/// exercises, logging sets and deleting history (ADR-001, ADR-015).
+/// exercises, logging sets and deleting history (ADR-002, ADR-011).
 ///
 /// Reps always come from the injected `RepCountingService`, so the same ViewModel works
 /// with manual input, the Apple Watch or a replayed recording.
@@ -151,7 +151,7 @@ final class WorkoutViewModel {
     }
 
     /// Validates the weight and reps boxes, applies the typed reps to the counter, and saves
-    /// the set. The saved rep count is read from the counter (ADR-002).
+    /// the set. The saved rep count is read from the counter (ADR-009).
     func completeSet() {
         guard case .enteringReps(let exerciseID) = setPhase else { return }
 
@@ -244,6 +244,7 @@ final class WorkoutViewModel {
         guard canSave else { return }
         do {
             try storage.saveWorkouts(workouts)
+            storageErrorMessage = nil
         } catch {
             logger.error("Saving workouts failed: \(String(describing: error), privacy: .public)")
             storageErrorMessage = "Your last change couldn't be saved."

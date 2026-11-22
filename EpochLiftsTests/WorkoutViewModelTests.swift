@@ -71,6 +71,31 @@ struct WorkoutViewModelTests {
         #expect(viewModel.storageErrorMessage != nil)
     }
 
+    @Test func successfulSaveClearsEarlierSaveError() {
+        let storage = FailingWorkoutStorage(saveFails: true)
+        let viewModel = makeViewModel(storage: storage)
+        viewModel.startWorkout()
+        #expect(viewModel.storageErrorMessage != nil)
+
+        storage.saveFails = false
+        viewModel.addExercise(bench)
+
+        #expect(viewModel.storageErrorMessage == nil)
+    }
+
+    @Test func saveFailureDuringCompleteSetKeepsSetInMemory() throws {
+        let storage = FailingWorkoutStorage()
+        let viewModel = makeViewModel(storage: storage)
+        let exerciseID = try startWorkoutWithBench(viewModel)
+
+        storage.saveFails = true
+        logSet(viewModel, exerciseID: exerciseID, weight: "225", reps: "5")
+
+        #expect(viewModel.activeWorkout?.exercises[0].sets.count == 1)
+        #expect(viewModel.storageErrorMessage != nil)
+        #expect(viewModel.setPhase == .notStarted)
+    }
+
     // MARK: - Workouts
 
     @Test func startWorkoutCreatesActiveWorkoutAndSaves() throws {

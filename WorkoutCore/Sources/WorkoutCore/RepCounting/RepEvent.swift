@@ -1,4 +1,4 @@
-/// A change in the rep count, sent by a rep counter whenever its count changes (ADR-003).
+/// A change in the rep count, sent by a rep counter whenever its count changes (ADR-010).
 public struct RepEvent: Hashable, Sendable {
     /// The rep count after the change.
     public let count: Int

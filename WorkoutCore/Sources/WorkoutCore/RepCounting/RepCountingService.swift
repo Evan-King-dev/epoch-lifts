@@ -1,4 +1,4 @@
-/// Anything that counts reps during a set: manual input, the Apple Watch, or a replayed recording (ADR-002).
+/// Anything that counts reps during a set: manual input, the Apple Watch, or a replayed recording (ADR-009).
 ///
 /// The ViewModel depends only on this protocol, so a rep source can be swapped without changing any UI code.
 /// This is the strategy pattern: the counting method is chosen in the composition root.
@@ -7,7 +7,7 @@ public protocol RepCountingService: AnyObject {
     /// The current rep count for the set. Never negative.
     var count: Int { get }
 
-    /// Sends a `RepEvent` every time `count` changes.
+    /// Sends a `RepEvent` every time `count` changes. Supports a single reader.
     var repEvents: AsyncStream<RepEvent> { get }
 
     /// Where this counter's reps come from. Stored on each saved set.
