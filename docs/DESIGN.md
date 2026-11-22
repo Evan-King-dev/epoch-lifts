@@ -264,7 +264,7 @@ struct RepEvent: Sendable {
 **Decision:**
 - Detect reps on the Watch and send only `RepEvent`s to the phone during a set.
 - Record raw motion to a file on the Watch and transfer it after each set.
-- The Watch is the source of truth for the rep count. If the phone is unreachable, the Watch keeps counting and syncs later (ADR-015).
+- The Watch does the counting. When the phone is reachable, the Watch's count fills the phone's reps box, which has the final say (ADR-015). If the phone is unreachable, the Watch keeps counting and syncs later.
 
 **Consequences:** The phone shows reps within about a second, and complete raw data still reaches the phone for testing and ML. Detection code must run on both platforms (see ADR-005).
 
@@ -274,11 +274,13 @@ struct RepEvent: Sendable {
 
 **Context:** The simulators provide no motion data, and testing at the gym is slow.
 
-**Decision:** `ReplayRepCounter` plays recorded motion files through `RepCountingService`.
+**Decision:**
+- Regression tests call the detection function directly on recorded samples and check the rep count, with no counter or app involved.
+- `ReplayRepCounter` is a thin wrapper that plays a recording through the same detection function and `RepCountingService`, for demos and work in the simulator.
 
 **Consequences:**
-- Sensor work can be done in the simulator.
-- Regression tests check that a given recording produces the expected rep count, so detection changes that break counting fail a test.
+- Detection changes that break counting fail a test that runs with `swift test`, without a simulator.
+- Sensor and UI work can be done in the simulator.
 - The app can be demonstrated without a Watch.
 
 #### ADR-014: Signal processing for counting, ML for quality
@@ -315,8 +317,13 @@ struct RepEvent: Sendable {
 **Decision:**
 - The phone owns the workout history. The Watch stores only sets it hasn't delivered yet.
 - When the phone is reachable, every set runs through the phone's ViewModel, Watch sets included. The phone tells the Watch which exercise is current; Start and Finish pressed on the Watch are forwarded to `beginSet` and `finishSet`. The count is checked in the phone's reps box and saved by `completeSet`, like any other set.
-- When the phone is unreachable, the Watch runs the set itself and keeps the finished set, with its UUID, until the phone confirms it. Offline sets are added to history as they arrive, without the correction step, and can be deleted afterwards like any set.
-- The phone remembers the UUID of every offline set it has received, including ones later deleted, and ignores those UUIDs. Resending is always safe and a deleted set never comes back.
+- When the phone is unreachable, the Watch runs the set itself and keeps the finished set, with its UUID, until the phone confirms it. The phone confirms a set only after it has been saved successfully: never while saving is off after a failed load, and not after a failed save. Unconfirmed sets stay on the Watch and are sent again. Offline sets are added to history as they arrive, without the correction step, and can be deleted afterwards like any set. They are added through a separate path that never changes the phone's set in progress (`setPhase`, `weightText`, `repsText`).
+- An offline set carries its UUID, the workout ID, the `LoggedExercise` ID, reps and `completedAt`. If the exercise was added on the Watch, the Watch creates the `LoggedExercise` ID when the exercise is added and also sends its `ExerciseType`; the phone adds that exercise to the workout only if its ID isn't there yet. The phone fills in the weight: the previous set of that exercise in the workout, as in ADR-011's pre-fill; otherwise the most recent weight for that `ExerciseType` in history; otherwise 0. Sets that arrive together are added in `completedAt` order, so each one sees the sets before it.
+- Offline sets pass the same validation as `completeSet`: reps 1 or more, weight 0 or more.
+- An offline set that fails validation, or whose workout no longer exists on the phone, is dropped and logged, and its ID is still recorded so resends are ignored. The Watch can't start a workout while the phone is unreachable, so a missing workout always means one the user deleted.
+- The phone keeps the IDs of every offline set it has received, and ignores any incoming set whose UUID is already in history or in that list. Resending is always safe and a deleted set never comes back.
+- A set that is ignored as a duplicate or dropped is still confirmed, once the history and received IDs are saved, so the Watch stops resending it.
+- If the Watch disconnects mid-set: `beginSet` creates the set's UUID and sends it to the Watch. If the Watch finishes that set offline, it keeps that UUID. When the phone receives a set whose UUID matches its own set in progress, it cancels its copy and adds the Watch's. This means `LoggedSet` IDs are created in `beginSet`, not `completeSet`.
 - Only one device drives a given set.
 
 **Alternatives:**
@@ -324,7 +331,7 @@ struct RepEvent: Sendable {
 - The phone drives every set from its own buttons and the Watch only counts: simplest, but the phone must be in hand for each set, which undercuts ADR-001.
 - Both devices keep full copies and merge: most flexible offline, but needs conflict rules, which is a sync engine.
 
-**Consequences:** Watch sets made with the phone reachable use the same path as manual sets, so the core requirement holds for the main source. Offline sets are the one path that skips `completeSet`. The list of received IDs is saved with the history, as a new optional field in the workouts file (ADR-008). The Watch app can't show history beyond the current workout.
+**Consequences:** Watch sets made with the phone reachable use the same path as manual sets, so the core requirement holds for the main source. Offline sets are the one path that skips `completeSet`. `WorkoutStorage` changes: load and save carry the workouts and the received offline set IDs as one value, saved atomically together in the workouts file (ADR-008), so the two can never disagree. The Watch app can't show history beyond the current workout.
 
 #### ADR-016: Rep counter chosen per set
 
@@ -347,7 +354,7 @@ struct RepEvent: Sendable {
 **Context:** Raw recordings become test fixtures and ML data, so changing their format later means converting all of them. The Watch writes about 100 samples a second and transfers each file after the set.
 
 **Decision:**
-- One file per recording, one recording per set. The file starts with the header's length as a 4-byte little-endian integer, then the JSON header, then the samples.
+- One file per recording, one recording per set. The file starts with the header's length as an unsigned 32-bit little-endian integer, then the JSON header, then the samples.
 - The header holds the format version, the ID of the set the recording belongs to, the nominal sample rate, and the axis order and units.
 - Each sample is a row of little-endian Float32 values: a timestamp in seconds since the recording started, then one value per axis. CoreMotion samples are slightly irregular and sometimes dropped, so real timing is kept per sample rather than derived from the sample rate. Float32 timestamps stay precise to under a millisecond for recordings up to an hour.
 - Values are converted to SI units when written (ADR-006): CoreMotion's acceleration in g is multiplied by 9.80665 to give m/s²; rotation rates are already in rad/s.
@@ -367,7 +374,7 @@ struct RepEvent: Sendable {
 - Layers are built bottom-up. Each step ends with passing tests and a commit.
 - ViewModels are tested with a fake rep counter and `InMemoryWorkoutStorage`.
 - Persistence is tested by saving and reloading data.
-- Rep detection is tested against recorded motion files using the replay counter.
+- Rep detection is tested by running the detection function directly on recorded motion files.
 - CI runs the tests on every push.
 
 ## 5. Build order
