@@ -85,9 +85,7 @@ cd WorkoutCore && swift test
 
 ## Roadmap
 
-- **V0.1**: Manual tracking rebuilt with tests, clean architecture, CI, TestFlight
-- **V0.2**: Apple Watch app: motion recording, rep detection, live rep counts on iPhone, ROM validation
-- **V0.3**: Per-rep feedback and personal ML rep-quality models trained on my own motion data
+Versions, planned features and proposed design decisions: **[docs/ROADMAP.md](docs/ROADMAP.md)**. Current feature status is in the [Features](#features) table above.
 
 ---
 
