@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Read-only token: the workflow only checks out and tests.
+permissions:
+  contents: read
+
+# One run per branch or PR; a newer push cancels the older run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: xcode-27
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      # The image default may not be 27.2; the project format requires 27.2 or later.
+      - name: Select Xcode 27.2
+        run: |
+          XCODE_APP=$(ls -d /Applications/Xcode_27.2*.app 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$XCODE_APP" ]; then
+            echo "::error::Xcode 27.2 not found in /Applications. Installed versions:"
+            ls -d /Applications/Xcode*.app
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=$XCODE_APP/Contents/Developer" >> "$GITHUB_ENV"
+          echo "Using $XCODE_APP"
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcrun simctl list runtimes
+
+      # The app scheme doesn't include the package tests; they run here with swift test.
+      - name: Test WorkoutCore package
+        working-directory: WorkoutCore
+        run: swift test --disable-xctest
+
+      # Select by ID: a name-only destination assumes the newest OS for that device.
+      - name: Pick iOS 27.2 simulator
+        run: |
+          SIM_ID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          for runtime, sims in devices.items():
+              if runtime.endswith("iOS-27-2"):
+                  for sim in sims:
+                      if sim["name"].startswith("iPhone"):
+                          print(sim["udid"])
+                          sys.exit(0)
+          ')
+          if [ -z "$SIM_ID" ]; then
+            echo "::error::No available iPhone simulator on the iOS 27.2 runtime."
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "SIM_ID=$SIM_ID" >> "$GITHUB_ENV"
+          echo "Using simulator $SIM_ID"
+
+      - name: Test app
+        run: |
+          xcodebuild test \
+            -project EpochLifts.xcodeproj \
+            -scheme EpochLifts \
+            -destination "id=$SIM_ID"
