@@ -1,5 +1,6 @@
 # Epoch Lifts
 
+[![CI](https://github.com/Evan-King-dev/epoch-lifts/actions/workflows/ci.yml/badge.svg)](https://github.com/Evan-King-dev/epoch-lifts/actions/workflows/ci.yml)
 
 **A workout tracker for iPhone and Apple Watch that counts reps from wrist motion and analyzes lift quality with on-device machine learning.**
 
@@ -64,7 +65,7 @@ Full reasoning for each design choice: **[docs/DESIGN.md](docs/DESIGN.md)**
 - **Swift 6**, **SwiftUI**, Swift Concurrency (`async`/`await`, `AsyncStream`)
 - **watchOS**, **CoreMotion**, **HealthKit** (`HKWorkoutSession`), **WatchConnectivity**: *planned*
 - **Core ML**, **Create ML**; Python + scikit-learn for model prototyping: *planned*
-- **Swift Testing** unit tests; GitHub Actions CI: *planned*
+- **Swift Testing** unit tests; GitHub Actions CI on pull requests and pushes to main
 - Persistence: Codable JSON file store behind a repository protocol (SwiftData migration planned)
 
 ---
