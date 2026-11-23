@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # The image default may not be 27.2; the project format requires 27.2 or later.
       - name: Select Xcode 27.2
