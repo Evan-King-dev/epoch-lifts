@@ -3,7 +3,7 @@ import Testing
 @testable import EpochLifts
 
 @MainActor
-struct WorkoutTimerViewTests {
+struct ElapsedTimeTextTests {
 
     @Test(arguments: [
         (0.0, "0:00:00"),
@@ -12,6 +12,6 @@ struct WorkoutTimerViewTests {
         (3725.0, "1:02:05"),
     ])
     func formatsElapsedTimeRoundingDown(seconds: TimeInterval, expected: String) {
-        #expect(WorkoutTimerView.text(for: seconds) == expected)
+        #expect(elapsedTimeText(seconds) == expected)
     }
 }

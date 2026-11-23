@@ -34,9 +34,13 @@ struct WorkoutListView: View {
                         Text("No past workouts yet.")
                     }
                     ForEach(viewModel.pastWorkouts) { workout in
-                        VStack(alignment: .leading) {
-                            Text(workout.startedAt, format: .dateTime.weekday().month().day().hour().minute())
-                            Text("Exercises: \(workout.exercises.count) · Sets: \(workout.totalSets)")
+                        NavigationLink {
+                            WorkoutDetailView(viewModel: viewModel, workoutID: workout.id)
+                        } label: {
+                            VStack(alignment: .leading) {
+                                Text(workout.startedAt, format: .dateTime.weekday().month().day().hour().minute())
+                                Text("\(elapsedTimeText(workout.duration())) · Exercises: \(workout.exercises.count) · Sets: \(workout.totalSets)")
+                            }
                         }
                         .swipeActions {
                             Button("Delete", role: .destructive) {

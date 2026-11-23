@@ -67,6 +67,11 @@ final class WorkoutViewModel {
         setPhase != .notStarted
     }
 
+    /// The workout with this ID, or `nil` if it no longer exists.
+    func workout(id: UUID) -> Workout? {
+        workouts.first { $0.id == id }
+    }
+
     /// Ended workouts, newest first, for the history list.
     var pastWorkouts: [Workout] {
         workouts.filter { !$0.isActive }.sorted { $0.startedAt > $1.startedAt }
@@ -116,11 +121,8 @@ final class WorkoutViewModel {
     func endWorkout() {
         guard let workoutIndex = activeWorkoutIndex else { return }
         cancelSet()
-        if isActiveWorkoutEmpty {
-            workouts.remove(at: workoutIndex)
-        } else {
-            workouts[workoutIndex].endedAt = now()
-        }
+        workouts[workoutIndex].endedAt = now()
+        removeEmptyEndedWorkouts()
         save()
     }
 
@@ -227,7 +229,8 @@ final class WorkoutViewModel {
         save()
     }
 
-    /// Deletes an exercise and its sets from whichever workout contains it.
+    /// Deletes an exercise and its sets from whichever workout contains it. An ended
+    /// workout left with no sets is deleted too.
     func deleteExercise(id: UUID) {
         if setPhase.exerciseID == id {
             cancelSet()
@@ -235,20 +238,29 @@ final class WorkoutViewModel {
         for workoutIndex in workouts.indices {
             workouts[workoutIndex].exercises.removeAll { $0.id == id }
         }
+        removeEmptyEndedWorkouts()
         save()
     }
 
-    /// Deletes a single set from whichever exercise contains it.
+    /// Deletes a single set from whichever exercise contains it. An ended workout left
+    /// with no sets is deleted too.
     func deleteSet(id: UUID) {
         for workoutIndex in workouts.indices {
             for exerciseIndex in workouts[workoutIndex].exercises.indices {
                 workouts[workoutIndex].exercises[exerciseIndex].sets.removeAll { $0.id == id }
             }
         }
+        removeEmptyEndedWorkouts()
         save()
     }
 
     // MARK: - Private
+
+    /// Deletes ended workouts that have no sets, so history never holds an empty entry.
+    /// The workout in progress is never deleted here (ADR-011).
+    private func removeEmptyEndedWorkouts() {
+        workouts.removeAll { !$0.isActive && $0.totalSets == 0 }
+    }
 
     private var activeWorkoutIndex: Int? {
         workouts.lastIndex(where: \.isActive)

@@ -468,6 +468,68 @@ struct WorkoutViewModelTests {
         #expect(viewModel.activeWorkout?.exercises[0].sets.map(\.reps) == [4])
     }
 
+    /// An ended workout with one bench press exercise holding the given rep counts as sets.
+    func pastWorkout(reps: [Int]) -> Workout {
+        let sets = reps.map { LoggedSet(reps: $0, weightLb: 135, completedAt: fixedDate, repSource: .manual) }
+        return Workout(
+            startedAt: fixedDate,
+            endedAt: fixedDate.addingTimeInterval(3600),
+            exercises: [LoggedExercise(exercise: bench, sets: sets)]
+        )
+    }
+
+    @Test func deleteLastSetOfPastWorkoutDeletesIt() throws {
+        let past = pastWorkout(reps: [5])
+        let storage = InMemoryWorkoutStorage(workouts: [past])
+        let viewModel = makeViewModel(storage: storage)
+        let setID = try #require(past.exercises[0].sets.first?.id)
+
+        viewModel.deleteSet(id: setID)
+
+        #expect(viewModel.workout(id: past.id) == nil)
+        #expect(storage.loadWorkouts().isEmpty)
+    }
+
+    @Test func deleteSetKeepsPastWorkoutWithOtherSets() throws {
+        let past = pastWorkout(reps: [5, 4])
+        let viewModel = makeViewModel(storage: InMemoryWorkoutStorage(workouts: [past]))
+        let setID = try #require(past.exercises[0].sets.first?.id)
+
+        viewModel.deleteSet(id: setID)
+
+        #expect(viewModel.workout(id: past.id)?.totalSets == 1)
+    }
+
+    @Test func deleteLastExerciseOfPastWorkoutDeletesIt() {
+        let past = pastWorkout(reps: [5, 4])
+        let storage = InMemoryWorkoutStorage(workouts: [past])
+        let viewModel = makeViewModel(storage: storage)
+
+        viewModel.deleteExercise(id: past.exercises[0].id)
+
+        #expect(viewModel.workout(id: past.id) == nil)
+        #expect(storage.loadWorkouts().isEmpty)
+    }
+
+    @Test func deleteLastSetOfActiveWorkoutKeepsIt() throws {
+        let viewModel = makeViewModel()
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
+        let setID = try #require(viewModel.activeWorkout?.exercises[0].sets.first?.id)
+
+        viewModel.deleteSet(id: setID)
+
+        #expect(viewModel.activeWorkout?.totalSets == 0)
+    }
+
+    @Test func workoutLookupFindsByID() {
+        let past = pastWorkout(reps: [5])
+        let viewModel = makeViewModel(storage: InMemoryWorkoutStorage(workouts: [past]))
+
+        #expect(viewModel.workout(id: past.id) == past)
+        #expect(viewModel.workout(id: UUID()) == nil)
+    }
+
     @Test func deleteExerciseCancelsItsSetInProgress() throws {
         let counter = FakeRepCounter()
         let viewModel = makeViewModel(counter: counter)
