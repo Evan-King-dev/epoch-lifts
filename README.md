@@ -18,6 +18,12 @@ Epoch Lifts is mainly a learning project covering: a thorough exploration of Swi
 | Feature | Status |
 |---|---|
 | Manual workout logging: exercises, sets, reps, weight, history | In progress (V0.1) |
+| Edit a saved set's weight and reps | Planned (V0.1) |
+| Rest timer that starts when a set is saved | Planned (after V0.1) |
+| Custom exercises | Planned (after V0.1) |
+| Workout templates | Planned (after V0.1) |
+| Exercise history: past sessions, "last time" while logging, PRs and estimated 1RM | Planned (after V0.1) |
+| CSV/JSON export | Planned (after V0.1) |
 | Apple Watch rep counting from wrist motion (CoreMotion) | Planned (V0.2) |
 | Range-of-motion validation (partial reps don't count) | Planned (V0.2) |
 | Raw motion recording + replay for testing and ML datasets | Planned (V0.2) |

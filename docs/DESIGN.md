@@ -275,6 +275,7 @@ ADR-012 to 017 are proposed; see [ROADMAP.md](ROADMAP.md).
 5. Composition root
 6. Unstyled views
 7. CI
-8. Device testing and TestFlight
+8. Edit saved sets
+9. Device testing and TestFlight
 
 V0.2 (Apple Watch): watchOS app, workout session and motion recording, file transfer, replay counter, rep detection, live rep events on the iPhone, range-of-motion validation.

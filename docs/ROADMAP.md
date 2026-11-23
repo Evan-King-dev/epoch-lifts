@@ -1,6 +1,6 @@
 # Epoch Lifts: Roadmap
 
-What comes after V0.1, and the design decisions proposed for it. Decisions already in effect are in [DESIGN.md](DESIGN.md). A proposed decision moves there once it is accepted, when its version starts.
+What comes next, and the design decisions proposed for it. Decisions already in effect are in [DESIGN.md](DESIGN.md). A proposed decision moves there once it is accepted, when its version starts.
 
 ## Versions
 
@@ -13,6 +13,22 @@ What comes after V0.1, and the design decisions proposed for it. Decisions alrea
 
 ## Planned features
 
+### V0.1
+
+- Edit a saved set's weight and reps (build step 8, before TestFlight).
+
+### After V0.1
+
+In order:
+
+1. Rest timer: starts automatically when a set is saved, notifies when done.
+2. Custom exercises: needs an ADR on IDs and storage when built.
+3. Workout templates: a named list of exercises; start a workout from one on the home screen; created with "Save as template" from a past workout, with an edit screen later; the first set of each exercise pre-fills from the most recent set of that exercise in history (changes ADR-011's pre-fill rule when built).
+4. Exercise history: every past session of one exercise, "last time" shown inline while logging, PRs and estimated 1RM; charts after styling starts.
+5. CSV/JSON export via the share sheet.
+
+Later: exercise search and filter, notes, plate calculator, Apple Health export with V0.2.
+
 ### V0.2: Apple Watch
 
 - watchOS app `EpochLiftsWatch`: start and stop sets, live rep count.
@@ -22,6 +38,7 @@ What comes after V0.1, and the design decisions proposed for it. Decisions alrea
 - `ReplayRepCounter` for simulator work and demos without a Watch.
 - Live rep counts on the iPhone and range-of-motion validation.
 - Optional: a live raw motion graph.
+- The Watch starts with Start/Finish buttons; automatic set start and end is a later option, and button-marked sets become its training data.
 
 ### V0.3: Feedback and ML
 
@@ -30,6 +47,7 @@ What comes after V0.1, and the design decisions proposed for it. Decisions alrea
 - Over time: trends.
 - Optional: automatic exercise detection.
 - Not possible with one wrist sensor: full-body form such as knee cave or back rounding.
+- An optional reps-in-reserve (RIR) field on `LoggedSet` would collect labels for the velocity-loss model; consider adding it early.
 
 ## Proposed decisions
 
