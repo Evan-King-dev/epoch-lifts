@@ -24,7 +24,8 @@ struct WorkoutViewModelTests {
         return try #require(viewModel.activeWorkout?.exercises.last?.id)
     }
 
-    /// Logs one full set through the normal flow.
+    /// Logs one full set through the normal flow. Works with manual and sensor counters:
+    /// steps that don't apply to the current phase do nothing.
     func logSet(_ viewModel: WorkoutViewModel, exerciseID: UUID, weight: String, reps: String) {
         viewModel.beginSet(for: exerciseID)
         viewModel.finishSet()
@@ -144,25 +145,78 @@ struct WorkoutViewModelTests {
     @Test func endWorkoutSetsEndDateAndSaves() throws {
         let storage = InMemoryWorkoutStorage()
         let viewModel = makeViewModel(storage: storage)
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "8")
+
+        viewModel.endWorkout()
+
+        #expect(viewModel.activeWorkout == nil)
+        #expect(viewModel.pastWorkouts.count == 1)
+        let saved = try #require(storage.loadWorkouts().first)
+        #expect(saved.endedAt == fixedDate)
+        #expect(saved.totalSets == 1)
+    }
+
+    @Test func endWorkoutWithNoExercisesDeletesIt() {
+        let storage = InMemoryWorkoutStorage()
+        let viewModel = makeViewModel(storage: storage)
 
         viewModel.startWorkout()
         viewModel.endWorkout()
 
-        #expect(viewModel.activeWorkout == nil)
-        let saved = try #require(storage.loadWorkouts().first)
-        #expect(saved.endedAt == fixedDate)
+        #expect(viewModel.workouts.isEmpty)
+        #expect(storage.loadWorkouts().isEmpty)
+        #expect(viewModel.canStartWorkout)
+    }
+
+    @Test func endWorkoutWithExercisesButNoSetsDeletesIt() throws {
+        let storage = InMemoryWorkoutStorage()
+        let viewModel = makeViewModel(storage: storage)
+        _ = try startWorkoutWithBench(viewModel)
+
+        viewModel.endWorkout()
+
+        #expect(viewModel.workouts.isEmpty)
+        #expect(storage.loadWorkouts().isEmpty)
+    }
+
+    @Test func isActiveWorkoutEmptyUntilFirstSet() throws {
+        let viewModel = makeViewModel()
+        #expect(!viewModel.isActiveWorkoutEmpty)
+
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        #expect(viewModel.isActiveWorkoutEmpty)
+
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "8")
+        #expect(!viewModel.isActiveWorkoutEmpty)
+    }
+
+    @Test func isSetInProgressFollowsSetFlow() throws {
+        let viewModel = makeViewModel(counter: FakeRepCounter(sourceType: .watch))
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        #expect(!viewModel.isSetInProgress)
+
+        viewModel.beginSet(for: exerciseID)
+        #expect(viewModel.isSetInProgress)
+
+        viewModel.finishSet()
+        #expect(viewModel.isSetInProgress)
+
+        viewModel.cancelSet()
+        #expect(!viewModel.isSetInProgress)
     }
 
     @Test func endWorkoutDiscardsUnfinishedSet() throws {
         let counter = FakeRepCounter()
         let viewModel = makeViewModel(counter: counter)
         let exerciseID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "8")
 
         viewModel.beginSet(for: exerciseID)
         viewModel.endWorkout()
 
         #expect(viewModel.setPhase == .notStarted)
-        #expect(viewModel.workouts[0].totalSets == 0)
+        #expect(viewModel.workouts[0].totalSets == 1)
         #expect(counter.calls.last == .reset)
     }
 
@@ -182,10 +236,47 @@ struct WorkoutViewModelTests {
         #expect(viewModel.workouts.isEmpty)
     }
 
+    @Test func addExerciseOpensFirstSetForManualCounter() throws {
+        let viewModel = makeViewModel()
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        #expect(viewModel.setPhase == .enteringReps(exerciseID: exerciseID))
+    }
+
+    @Test func addExerciseDoesNotStartSensorCounting() throws {
+        let counter = FakeRepCounter(sourceType: .watch)
+        let viewModel = makeViewModel(counter: counter)
+        _ = try startWorkoutWithBench(viewModel)
+
+        #expect(viewModel.setPhase == .notStarted)
+        #expect(counter.calls.isEmpty)
+    }
+
+    @Test func addExerciseKeepsSetInProgress() throws {
+        let viewModel = makeViewModel()
+        let benchID = try startWorkoutWithBench(viewModel)
+
+        viewModel.addExercise(ExerciseType.defaults[1])
+
+        #expect(viewModel.activeWorkout?.exercises.count == 2)
+        #expect(viewModel.setPhase == .enteringReps(exerciseID: benchID))
+    }
+
     // MARK: - Set flow
 
-    @Test func beginSetResetsAndStartsCounter() throws {
+    @Test func manualBeginSetGoesStraightToEnteringReps() throws {
         let counter = FakeRepCounter()
+        let viewModel = makeViewModel(counter: counter)
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        viewModel.cancelSet()
+
+        viewModel.beginSet(for: exerciseID)
+
+        #expect(Array(counter.calls.suffix(3)) == [.reset, .startCounting, .stopCounting])
+        #expect(viewModel.setPhase == .enteringReps(exerciseID: exerciseID))
+    }
+
+    @Test func sensorBeginSetResetsAndStartsCounter() throws {
+        let counter = FakeRepCounter(sourceType: .watch)
         let viewModel = makeViewModel(counter: counter)
         let exerciseID = try startWorkoutWithBench(viewModel)
 
@@ -206,8 +297,8 @@ struct WorkoutViewModelTests {
         #expect(counter.calls.isEmpty)
     }
 
-    @Test func finishSetStopsCounter() throws {
-        let counter = FakeRepCounter()
+    @Test func sensorFinishSetStopsCounter() throws {
+        let counter = FakeRepCounter(sourceType: .watch)
         let viewModel = makeViewModel(counter: counter)
         let exerciseID = try startWorkoutWithBench(viewModel)
 
@@ -282,7 +373,7 @@ struct WorkoutViewModelTests {
     }
 
     @Test func cancelSetSavesNothing() throws {
-        let counter = FakeRepCounter()
+        let counter = FakeRepCounter(sourceType: .watch)
         let viewModel = makeViewModel(counter: counter)
         let exerciseID = try startWorkoutWithBench(viewModel)
 
@@ -298,11 +389,9 @@ struct WorkoutViewModelTests {
 
     @Test func firstSetStartsWithEmptyBoxes() throws {
         let viewModel = makeViewModel()
-        let exerciseID = try startWorkoutWithBench(viewModel)
+        _ = try startWorkoutWithBench(viewModel)
 
-        viewModel.beginSet(for: exerciseID)
         #expect(viewModel.weightText.isEmpty)
-        viewModel.finishSet()
         #expect(viewModel.repsText.isEmpty)
     }
 
@@ -312,8 +401,8 @@ struct WorkoutViewModelTests {
         logSet(viewModel, exerciseID: exerciseID, weight: "225", reps: "5")
 
         viewModel.beginSet(for: exerciseID)
+
         #expect(viewModel.weightText == "225")
-        viewModel.finishSet()
         #expect(viewModel.repsText == "5")
     }
 

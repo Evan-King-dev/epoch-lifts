@@ -245,11 +245,14 @@ struct RepEvent: Sendable {
 **Decision:**
 - `WorkoutViewModel` lives in the app target: it is iPhone screen state, and the Watch will have its own. Pure logic it uses, such as `SetInput` (parsing the weight and reps boxes), lives in `WorkoutCore` so it is tested with `swift test`.
 - Set flow: `beginSet` → `finishSet` → `completeSet` or `cancelSet`. The reps box is plain text until Done; `completeSet` passes it to `correctCount(to:)` and saves the counter's `count` (ADR-009). No separate `correctReps`.
+- With a manual counter there is nothing to count during the set, so `beginSet` goes straight to the weight and reps boxes: no Start or Finish taps. The lifting phase and `finishSet` are only for sensor counters. The ViewModel decides this from the counter's `sourceType`, never its concrete type, and views only follow the set phase.
+- Adding an exercise opens its first set's weight and reps boxes, when the counter is manual and no other set is in progress.
 - Validation: weight is 0 or more (0 = bodyweight); reps are a whole number of 1 or more.
 - Pre-fill from the previous set of the same exercise in this workout: weight always, reps only when the counter reads 0, so a sensor count is never replaced.
 - After a failed load, saving is off for the session (ADR-008).
+- Ending a workout with no sets deletes it instead of saving an empty entry in history.
 
-**Alternatives:** ViewModel in `WorkoutCore` (faster tests, but iPhone state in the shared package and `public` everywhere); no pre-fill (simpler, but most sets repeat the last one).
+**Alternatives:** ViewModel in `WorkoutCore` (faster tests, but iPhone state in the shared package and `public` everywhere); no pre-fill (simpler, but most sets repeat the last one); Start and Finish for every source (one flow, but two extra taps per manual set for nothing).
 
 **Consequences:** ViewModel tests need the simulator. Reading `repEvents` live waits for the Watch counter in V0.2.
 

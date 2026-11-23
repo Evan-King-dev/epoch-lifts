@@ -57,6 +57,16 @@ final class WorkoutViewModel {
         activeWorkoutIndex == nil
     }
 
+    /// True when the workout in progress has no saved sets, so ending it deletes it.
+    var isActiveWorkoutEmpty: Bool {
+        activeWorkout?.totalSets == 0
+    }
+
+    /// True while a set has been started but not yet saved or cancelled.
+    var isSetInProgress: Bool {
+        setPhase != .notStarted
+    }
+
     /// Ended workouts, newest first, for the history list.
     var pastWorkouts: [Workout] {
         workouts.filter { !$0.isActive }.sorted { $0.startedAt > $1.startedAt }
@@ -101,25 +111,38 @@ final class WorkoutViewModel {
         save()
     }
 
-    /// Ends the workout in progress. An unfinished set is discarded.
+    /// Ends the workout in progress. An unfinished set is discarded. A workout with no
+    /// sets is deleted instead of being kept in history.
     func endWorkout() {
         guard let workoutIndex = activeWorkoutIndex else { return }
         cancelSet()
-        workouts[workoutIndex].endedAt = now()
+        if isActiveWorkoutEmpty {
+            workouts.remove(at: workoutIndex)
+        } else {
+            workouts[workoutIndex].endedAt = now()
+        }
         save()
     }
 
-    /// Adds an exercise to the workout in progress.
+    /// Adds an exercise to the workout in progress. With a manual counter, also opens its
+    /// first set's weight and reps boxes, unless another set is in progress (ADR-011).
     func addExercise(_ exerciseType: ExerciseType) {
         guard let workoutIndex = activeWorkoutIndex else { return }
-        workouts[workoutIndex].exercises.append(LoggedExercise(exercise: exerciseType))
+        let exercise = LoggedExercise(exercise: exerciseType)
+        workouts[workoutIndex].exercises.append(exercise)
         save()
+
+        if repCounter.sourceType == .manual {
+            beginSet(for: exercise.id)
+        }
     }
 
     // MARK: - Sets
 
     /// Starts a set for an exercise in the workout in progress and starts the rep counter.
     /// Pre-fills the weight box with the previous set's weight for that exercise.
+    /// A manual counter has nothing to count during the set, so the set goes straight to
+    /// entering weight and reps (ADR-011).
     func beginSet(for exerciseID: UUID) {
         guard setPhase == .notStarted,
               let exercise = activeWorkout?.exercises.first(where: { $0.id == exerciseID })
@@ -132,6 +155,10 @@ final class WorkoutViewModel {
         repCounter.reset()
         repCounter.startCounting()
         setPhase = .lifting(exerciseID: exerciseID)
+
+        if repCounter.sourceType == .manual {
+            finishSet()
+        }
     }
 
     /// Stops the rep counter and fills the reps box for the user to check.

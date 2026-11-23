@@ -7,6 +7,9 @@ struct ActiveWorkoutView: View {
     var viewModel: WorkoutViewModel
 
     @State private var isShowingExercisePicker = false
+    @State private var isConfirmingEndWorkout = false
+    @State private var isConfirmingDeleteExercise = false
+    @State private var exerciseToDelete: LoggedExercise?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -18,12 +21,17 @@ struct ActiveWorkoutView: View {
             }
 
             if let workout = viewModel.activeWorkout {
+                Section {
+                    WorkoutTimerView(workout: workout)
+                }
+
                 ForEach(workout.exercises) { exercise in
                     Section {
                         Text(exercise.exercise.name)
                             .swipeActions {
                                 Button("Delete", role: .destructive) {
-                                    viewModel.deleteExercise(id: exercise.id)
+                                    exerciseToDelete = exercise
+                                    isConfirmingDeleteExercise = true
                                 }
                             }
 
@@ -45,8 +53,7 @@ struct ActiveWorkoutView: View {
                         isShowingExercisePicker = true
                     }
                     Button("End workout", role: .destructive) {
-                        viewModel.endWorkout()
-                        dismiss()
+                        isConfirmingEndWorkout = true
                     }
                 }
             } else {
@@ -60,6 +67,30 @@ struct ActiveWorkoutView: View {
                 viewModel.addExercise(exerciseType)
                 isShowingExercisePicker = false
             }
+        }
+        .confirmationDialog("End this workout?", isPresented: $isConfirmingEndWorkout, titleVisibility: .visible) {
+            Button("End workout", role: .destructive) {
+                viewModel.endWorkout()
+                dismiss()
+            }
+        } message: {
+            if viewModel.isActiveWorkoutEmpty {
+                Text("This workout has no sets, so it won't be saved.")
+            } else if viewModel.isSetInProgress {
+                Text("The set in progress hasn't been saved and will be discarded.")
+            }
+        }
+        .confirmationDialog(
+            "Delete this exercise?",
+            isPresented: $isConfirmingDeleteExercise,
+            titleVisibility: .visible,
+            presenting: exerciseToDelete
+        ) { exercise in
+            Button("Delete \(exercise.exercise.name)", role: .destructive) {
+                viewModel.deleteExercise(id: exercise.id)
+            }
+        } message: { _ in
+            Text("Its sets will be deleted too.")
         }
     }
 }

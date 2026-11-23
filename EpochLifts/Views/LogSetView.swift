@@ -1,8 +1,8 @@
 import SwiftUI
 import WorkoutCore
 
-/// The rows for logging a set of one exercise: start the set, finish it, then check weight
-/// and reps and save (ADR-011). Shows nothing while another exercise's set is in progress.
+/// The rows for logging a set of one exercise: add a set, then check weight and reps and save.
+/// Sensor counters also show Finish while counting (ADR-011). Shows nothing while another exercise's set is in progress.
 struct LogSetView: View {
     @Bindable var viewModel: WorkoutViewModel
     let exerciseID: UUID
@@ -10,7 +10,7 @@ struct LogSetView: View {
     var body: some View {
         switch viewModel.setPhase {
         case .notStarted:
-            Button("Start set") {
+            Button("Add set") {
                 viewModel.beginSet(for: exerciseID)
             }
 
