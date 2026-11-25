@@ -13,10 +13,6 @@ What comes next, and the design decisions proposed for it. Decisions already in 
 
 ## Planned features
 
-### V0.1
-
-- Edit a saved set's weight and reps (build step 8, before TestFlight).
-
 ### After V0.1
 
 In order:

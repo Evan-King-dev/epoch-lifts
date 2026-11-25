@@ -19,7 +19,7 @@ Epoch Lifts is mainly a learning project covering: a thorough exploration of Swi
 | Feature | Status |
 |---|---|
 | Manual workout logging: exercises, sets, reps, weight, history | In progress (V0.1) |
-| Edit a saved set's weight and reps | Planned (V0.1) |
+| Edit a saved set's weight and reps | Done (V0.1) |
 | Rest timer that starts when a set is saved | Planned (after V0.1) |
 | Custom exercises | Planned (after V0.1) |
 | Workout templates | Planned (after V0.1) |
