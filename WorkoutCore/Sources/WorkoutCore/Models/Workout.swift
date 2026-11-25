@@ -34,6 +34,11 @@ public struct Workout: Codable, Hashable, Identifiable, Sendable {
         exercises.reduce(0) { total, exercise in total + exercise.sets.count }
     }
 
+    /// When the latest set across all exercises was completed, or `startedAt` if there are no sets.
+    public var lastActivityAt: Date {
+        exercises.flatMap(\.sets).map(\.completedAt).max() ?? startedAt
+    }
+
     /// Elapsed time in seconds. For an active workout, measured up to `now`.
     /// Never negative: returns 0 if the end time (or `now`) is before the start, for example
     /// after the device clock is set back.

@@ -77,6 +77,10 @@ final class WorkoutViewModel {
         workouts.filter { !$0.isActive }.sorted { $0.startedAt > $1.startedAt }
     }
 
+    /// How long after its last activity an active workout counts as forgotten. The reason
+    /// for four hours is in ADR-011.
+    static let forgottenWorkoutCutoff: TimeInterval = 4 * 60 * 60
+
     private let storage: any WorkoutStorage
     private let repCounter: any RepCountingService
     private let now: () -> Date
@@ -104,7 +108,9 @@ final class WorkoutViewModel {
             logger.error("Loading workouts failed: \(String(describing: error), privacy: .public)")
             canSave = false
             storageErrorMessage = "Your saved workouts couldn't be read. New changes won't be saved."
+            return
         }
+        endForgottenWorkout()
     }
 
     // MARK: - Workouts
@@ -119,11 +125,7 @@ final class WorkoutViewModel {
     /// Ends the workout in progress. An unfinished set is discarded. A workout with no
     /// sets is deleted instead of being kept in history.
     func endWorkout() {
-        guard let workoutIndex = activeWorkoutIndex else { return }
-        cancelSet()
-        workouts[workoutIndex].endedAt = now()
-        removeEmptyEndedWorkouts()
-        save()
+        endActiveWorkout(at: now())
     }
 
     /// Adds an exercise to the workout in progress. With a manual counter, also opens its
@@ -137,6 +139,18 @@ final class WorkoutViewModel {
         if repCounter.sourceType == .manual {
             beginSet(for: exercise.id)
         }
+    }
+
+    /// Ends the workout in progress at its last activity if that was more than
+    /// `forgottenWorkoutCutoff` ago, the same way `endWorkout()` does (ADR-011).
+    /// Runs after a successful load and whenever the app becomes active, since the app may
+    /// stay in memory for days. On launch it runs twice; the second run finds nothing to end.
+    func endForgottenWorkout() {
+        guard let lastActivityAt = activeWorkout?.lastActivityAt,
+              now().timeIntervalSince(lastActivityAt) > Self.forgottenWorkoutCutoff
+        else { return }
+        logger.info("Ending a forgotten workout at its last activity")
+        endActiveWorkout(at: lastActivityAt)
     }
 
     // MARK: - Sets
@@ -256,6 +270,16 @@ final class WorkoutViewModel {
     }
 
     // MARK: - Private
+
+    /// Ends the workout in progress at `date`: discards an unfinished set, deletes the
+    /// workout if it has no sets, and saves.
+    private func endActiveWorkout(at date: Date) {
+        guard let workoutIndex = activeWorkoutIndex else { return }
+        cancelSet()
+        workouts[workoutIndex].endedAt = date
+        removeEmptyEndedWorkouts()
+        save()
+    }
 
     /// Deletes ended workouts that have no sets, so history never holds an empty entry.
     /// The workout in progress is never deleted here (ADR-011).

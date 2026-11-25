@@ -249,8 +249,10 @@ struct RepEvent: Sendable {
 - Validation: weight is 0 or more (0 = bodyweight); reps are a whole number of 1 or more.
 - Pre-fill from the previous set of the same exercise in this workout: weight always, reps only when the counter reads 0, so a sensor count is never replaced.
 - After a failed load, saving is off for the session (ADR-008).
+- An ended workout with no sets is deleted, so history never holds an empty entry.
+- Forgotten workouts: on load and whenever the app returns to the foreground, an active workout whose last activity (its latest set, or its start if it has no sets) is more than 4 hours old is ended at that time. Adding an exercise does not count as activity. Four hours is longer than any real rest between sets but short enough to end a forgotten workout before the next day's, and ending at the last activity keeps the duration real.
 
-**Alternatives:** ViewModel in `WorkoutCore` (faster tests, but iPhone state in the shared package and `public` everywhere); no pre-fill (simpler, but most sets repeat the last one); Start and Finish for every source (one flow, but two extra taps per manual set for nothing).
+**Alternatives:** ViewModel in `WorkoutCore` (faster tests, but iPhone state in the shared package and `public` everywhere); no pre-fill (simpler, but most sets repeat the last one); asking on launch whether to end an old workout (an extra prompt for a case with one sensible answer); Start and Finish for every source (one flow, but two extra taps per manual set for nothing).
 
 **Consequences:** ViewModel tests need the simulator. Reading `repEvents` live waits for the Watch counter in V0.2.
 
