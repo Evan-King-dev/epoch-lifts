@@ -51,6 +51,22 @@ struct WorkoutListView: View {
                 ActiveWorkoutView(viewModel: viewModel)
             }
         }
+        .sheet(item: editingSetBinding) { _ in
+            EditSetView(viewModel: viewModel)
+        }
+    }
+
+    /// Shows the edit sheet while an edit is open on a set that still exists, from any
+    /// screen in the stack. Swiping the sheet away cancels the edit.
+    private var editingSetBinding: Binding<LoggedSet?> {
+        Binding(
+            get: { viewModel.editingSet },
+            set: { newValue in
+                if newValue == nil {
+                    viewModel.cancelEdit()
+                }
+            }
+        )
     }
 }
 

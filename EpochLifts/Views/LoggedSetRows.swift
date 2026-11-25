@@ -1,7 +1,7 @@
 import SwiftUI
 import WorkoutCore
 
-/// One row per saved set of an exercise, numbered from 1, with swipe to delete.
+/// One row per saved set of an exercise, numbered from 1. Tap to edit, swipe to delete.
 /// Shared by the workout in progress and past workouts.
 struct LoggedSetRows: View {
     var viewModel: WorkoutViewModel
@@ -9,12 +9,14 @@ struct LoggedSetRows: View {
 
     var body: some View {
         ForEach(Array(exercise.sets.enumerated()), id: \.element.id) { index, set in
-            Text("Set \(index + 1): \(SetInput.text(forWeightLb: set.weightLb)) lb × \(set.reps)")
-                .swipeActions {
-                    Button("Delete", role: .destructive) {
-                        viewModel.deleteSet(id: set.id)
-                    }
+            Button("Set \(index + 1): \(SetInput.text(forWeightLb: set.weightLb)) lb × \(set.reps)") {
+                viewModel.beginEdit(setID: set.id)
+            }
+            .swipeActions {
+                Button("Delete", role: .destructive) {
+                    viewModel.deleteSet(id: set.id)
                 }
+            }
         }
     }
 }
