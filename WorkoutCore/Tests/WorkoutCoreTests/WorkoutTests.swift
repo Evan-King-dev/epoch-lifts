@@ -54,14 +54,14 @@ struct WorkoutTests {
     }
 
     @Test func jsonRoundTripKeepsEverything() throws {
-        let session = LoggedExercise(
+        let bench = LoggedExercise(
             exercise: ExerciseType.defaults[0],
             sets: [
                 makeSet(reps: 10),
                 LoggedSet(reps: 6, weightLb: 22.5, completedAt: oneHourLater, repSource: .watch),
             ]
         )
-        let original = Workout(startedAt: start, endedAt: oneHourLater, exercises: [session])
+        let original = Workout(startedAt: start, endedAt: oneHourLater, exercises: [bench])
 
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(Workout.self, from: data)

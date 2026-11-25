@@ -14,11 +14,7 @@ struct ActiveWorkoutView: View {
 
     var body: some View {
         List {
-            if let message = viewModel.storageErrorMessage {
-                Section {
-                    Text(message)
-                }
-            }
+            StorageErrorSection(message: viewModel.storageErrorMessage)
 
             if let workout = viewModel.activeWorkout {
                 Section {
@@ -35,14 +31,7 @@ struct ActiveWorkoutView: View {
                                 }
                             }
 
-                        ForEach(Array(exercise.sets.enumerated()), id: \.element.id) { index, set in
-                            Text("Set \(index + 1): \(SetInput.text(forWeightLb: set.weightLb)) lb × \(set.reps)")
-                                .swipeActions {
-                                    Button("Delete", role: .destructive) {
-                                        viewModel.deleteSet(id: set.id)
-                                    }
-                                }
-                        }
+                        LoggedSetRows(viewModel: viewModel, exercise: exercise)
 
                         LogSetView(viewModel: viewModel, exerciseID: exercise.id)
                     }

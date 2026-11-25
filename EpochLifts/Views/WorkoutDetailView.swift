@@ -18,17 +18,11 @@ struct WorkoutDetailView: View {
 
     var body: some View {
         List {
-            if let message = viewModel.storageErrorMessage {
-                Section {
-                    Text(message)
-                }
-            }
+            StorageErrorSection(message: viewModel.storageErrorMessage)
 
             if let workout {
                 Section {
-                    LabeledContent("Date") {
-                        Text(workout.startedAt, format: .dateTime.weekday().month().day().hour().minute())
-                    }
+                    LabeledContent("Date", value: workoutDateText(workout.startedAt))
                     LabeledContent("Duration", value: elapsedTimeText(workout.duration()))
                 }
 
@@ -42,14 +36,7 @@ struct WorkoutDetailView: View {
                                 }
                             }
 
-                        ForEach(Array(exercise.sets.enumerated()), id: \.element.id) { index, set in
-                            Text("Set \(index + 1): \(SetInput.text(forWeightLb: set.weightLb)) lb × \(set.reps)")
-                                .swipeActions {
-                                    Button("Delete", role: .destructive) {
-                                        viewModel.deleteSet(id: set.id)
-                                    }
-                                }
-                        }
+                        LoggedSetRows(viewModel: viewModel, exercise: exercise)
                     }
                 }
             }

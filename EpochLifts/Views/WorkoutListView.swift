@@ -10,11 +10,7 @@ struct WorkoutListView: View {
     var body: some View {
         NavigationStack {
             List {
-                if let message = viewModel.storageErrorMessage {
-                    Section {
-                        Text(message)
-                    }
-                }
+                StorageErrorSection(message: viewModel.storageErrorMessage)
 
                 Section {
                     if viewModel.canStartWorkout {
@@ -38,7 +34,7 @@ struct WorkoutListView: View {
                             WorkoutDetailView(viewModel: viewModel, workoutID: workout.id)
                         } label: {
                             VStack(alignment: .leading) {
-                                Text(workout.startedAt, format: .dateTime.weekday().month().day().hour().minute())
+                                Text(workoutDateText(workout.startedAt))
                                 Text("\(elapsedTimeText(workout.duration())) · Exercises: \(workout.exercises.count) · Sets: \(workout.totalSets)")
                             }
                         }

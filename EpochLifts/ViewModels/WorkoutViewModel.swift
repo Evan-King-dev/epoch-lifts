@@ -148,7 +148,7 @@ final class WorkoutViewModel {
     /// entering weight and reps (ADR-011), with both boxes pre-filled.
     func beginSet(for exerciseID: UUID) {
         guard setPhase == .notStarted,
-              let exercise = activeWorkout?.exercises.first(where: { $0.id == exerciseID })
+              let exercise = loggedExercise(id: exerciseID)
         else { return }
 
         weightText = exercise.sets.last.map { SetInput.text(forWeightLb: $0.weightLb) } ?? ""

@@ -159,11 +159,11 @@ Workout                              one gym visit
 - A `LoggedExercise` stores a copy of its `ExerciseType`, so history keeps the name even if the catalogue changes, and views need no lookup.
 - `weightLb` of 0 means bodyweight.
 - `Workout.endedAt` is nil while the workout is in progress. `isActive` and `totalSets` are computed. `duration(now:)` takes the current time as a parameter so it can be tested.
-- Workouts, sessions and sets use UUIDs generated once at creation. Only catalogue exercises need stable IDs (ADR-006).
+- Workouts, logged exercises and sets use UUIDs generated once at creation. Only catalogue exercises need stable IDs (ADR-006).
 - Not included yet: recording IDs, rep metrics, custom exercises. Each will be added as an optional field or a separate feature when needed.
 
 **Alternatives:**
-- Store only `exerciseID` in a session: smaller, but every view would need the catalogue to show a name.
+- Store only `exerciseID` in a `LoggedExercise`: smaller, but every view would need the catalogue to show a name.
 - Optional weight with nil for bodyweight: more precise, but adds nil handling everywhere for little benefit.
 
 **Consequences:** The saved format follows these types directly. `formatVersion` belongs to the file wrapper added with persistence (step 2), not to the models.
