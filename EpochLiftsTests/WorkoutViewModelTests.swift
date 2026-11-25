@@ -554,6 +554,302 @@ struct WorkoutViewModelTests {
         #expect(viewModel.activeWorkout?.exercises[0].sets.first?.weightLb == 0)
     }
 
+    // MARK: - Editing saved sets
+
+    /// Starts a workout with one bench press set of 135 lb × 5 and returns that set's ID.
+    func logOneBenchSet(_ viewModel: WorkoutViewModel) throws -> UUID {
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
+        return try #require(viewModel.activeWorkout?.exercises[0].sets.last?.id)
+    }
+
+    @Test func beginEditFillsBoxesFromSavedSet() throws {
+        let past = pastWorkout(reps: [5])
+        let viewModel = makeViewModel(storage: InMemoryWorkoutStorage(workouts: [past]))
+        let set = past.exercises[0].sets[0]
+
+        viewModel.beginEdit(setID: set.id)
+
+        #expect(viewModel.editingSet == set)
+        #expect(viewModel.editWeightText == "135")
+        #expect(viewModel.editRepsText == "5")
+        #expect(viewModel.editErrorMessage == nil)
+    }
+
+    @Test func beginEditWithUnknownSetDoesNothing() {
+        let viewModel = makeViewModel(storage: InMemoryWorkoutStorage(workouts: [pastWorkout(reps: [5])]))
+
+        viewModel.beginEdit(setID: UUID())
+
+        #expect(viewModel.editingSetID == nil)
+        #expect(viewModel.editingSet == nil)
+    }
+
+    @Test func beginEditReplacesOpenEdit() {
+        let past = pastWorkout(reps: [5, 4])
+        let viewModel = makeViewModel(storage: InMemoryWorkoutStorage(workouts: [past]))
+        viewModel.beginEdit(setID: past.exercises[0].sets[0].id)
+        viewModel.editRepsText = "99"
+
+        viewModel.beginEdit(setID: past.exercises[0].sets[1].id)
+
+        #expect(viewModel.editingSetID == past.exercises[0].sets[1].id)
+        #expect(viewModel.editRepsText == "4")
+    }
+
+    @Test func cancelEditChangesNothingAndDoesNotSave() throws {
+        let storage = FailingWorkoutStorage()
+        let viewModel = makeViewModel(storage: storage)
+        let setID = try logOneBenchSet(viewModel)
+        let savesBefore = storage.saveCallCount
+
+        viewModel.beginEdit(setID: setID)
+        viewModel.editRepsText = "8"
+        viewModel.cancelEdit()
+
+        #expect(viewModel.editingSetID == nil)
+        #expect(viewModel.activeWorkout?.exercises[0].sets[0].reps == 5)
+        #expect(storage.saveCallCount == savesBefore)
+    }
+
+    @Test func saveEditWithNoOpenEditDoesNothing() throws {
+        let storage = FailingWorkoutStorage()
+        let viewModel = makeViewModel(storage: storage)
+        _ = try logOneBenchSet(viewModel)
+        let savesBefore = storage.saveCallCount
+
+        viewModel.saveEdit()
+
+        #expect(viewModel.activeWorkout?.exercises[0].sets[0].reps == 5)
+        #expect(storage.saveCallCount == savesBefore)
+    }
+
+    @Test func validEditChangesWeightAndRepsOnlyAndSaves() throws {
+        let storage = InMemoryWorkoutStorage()
+        let viewModel = makeViewModel(storage: storage, counter: FakeRepCounter(sourceType: .watch))
+        let setID = try logOneBenchSet(viewModel)
+        let original = try #require(viewModel.activeWorkout?.exercises[0].sets[0])
+
+        viewModel.beginEdit(setID: setID)
+        viewModel.editWeightText = "140"
+        viewModel.editRepsText = "6"
+        viewModel.saveEdit()
+
+        let edited = try #require(viewModel.activeWorkout?.exercises[0].sets[0])
+        #expect(edited.weightLb == 140)
+        #expect(edited.reps == 6)
+        #expect(edited.id == original.id)
+        #expect(edited.completedAt == original.completedAt)
+        #expect(edited.repSource == .watch)
+        #expect(viewModel.editingSetID == nil)
+        #expect(makeViewModel(storage: storage).workouts == viewModel.workouts)
+    }
+
+    @Test func saveEditWithUnchangedValuesStillSaves() throws {
+        let storage = FailingWorkoutStorage()
+        let viewModel = makeViewModel(storage: storage)
+        let setID = try logOneBenchSet(viewModel)
+        let savesBefore = storage.saveCallCount
+
+        viewModel.beginEdit(setID: setID)
+        viewModel.saveEdit()
+
+        #expect(storage.saveCallCount == savesBefore + 1)
+        #expect(viewModel.editingSetID == nil)
+    }
+
+    @Test(arguments: ["", "abc", "-5", "nan"])
+    func invalidEditWeightIsRejected(weight: String) throws {
+        let storage = FailingWorkoutStorage()
+        let viewModel = makeViewModel(storage: storage)
+        let setID = try logOneBenchSet(viewModel)
+        let savesBefore = storage.saveCallCount
+
+        viewModel.beginEdit(setID: setID)
+        viewModel.editWeightText = weight
+        viewModel.saveEdit()
+
+        #expect(viewModel.editErrorMessage != nil)
+        #expect(viewModel.inputErrorMessage == nil)
+        #expect(viewModel.editingSetID == setID)
+        #expect(viewModel.activeWorkout?.exercises[0].sets[0].weightLb == 135)
+        #expect(storage.saveCallCount == savesBefore)
+
+        let exerciseID = try #require(viewModel.activeWorkout?.exercises[0].id)
+        logSet(viewModel, exerciseID: exerciseID, weight: weight, reps: "5")
+        #expect(viewModel.inputErrorMessage == viewModel.editErrorMessage)
+    }
+
+    @Test(arguments: ["", "0", "-1", "2.5", "x"])
+    func invalidEditRepsAreRejected(reps: String) throws {
+        let storage = FailingWorkoutStorage()
+        let viewModel = makeViewModel(storage: storage)
+        let setID = try logOneBenchSet(viewModel)
+        let savesBefore = storage.saveCallCount
+
+        viewModel.beginEdit(setID: setID)
+        viewModel.editRepsText = reps
+        viewModel.saveEdit()
+
+        #expect(viewModel.editErrorMessage != nil)
+        #expect(viewModel.inputErrorMessage == nil)
+        #expect(viewModel.editingSetID == setID)
+        #expect(viewModel.activeWorkout?.exercises[0].sets[0].reps == 5)
+        #expect(storage.saveCallCount == savesBefore)
+
+        let exerciseID = try #require(viewModel.activeWorkout?.exercises[0].id)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: reps)
+        #expect(viewModel.inputErrorMessage == viewModel.editErrorMessage)
+    }
+
+    @Test func editInPastWorkoutKeepsItEnded() {
+        let past = pastWorkout(reps: [5])
+        let storage = InMemoryWorkoutStorage(workouts: [past])
+        let viewModel = makeViewModel(storage: storage)
+
+        viewModel.beginEdit(setID: past.exercises[0].sets[0].id)
+        viewModel.editRepsText = "8"
+        viewModel.saveEdit()
+
+        let edited = viewModel.workout(id: past.id)
+        #expect(edited?.exercises[0].sets[0].reps == 8)
+        #expect(edited?.endedAt == past.endedAt)
+        #expect(storage.loadWorkouts() == viewModel.workouts)
+    }
+
+    @Test func editAfterFailedLoadAppliesInMemoryAndNeverSaves() throws {
+        let storage = FailingWorkoutStorage(loadFails: true)
+        let viewModel = makeViewModel(storage: storage)
+        let setID = try logOneBenchSet(viewModel)
+
+        viewModel.beginEdit(setID: setID)
+        viewModel.editRepsText = "8"
+        viewModel.saveEdit()
+
+        #expect(viewModel.activeWorkout?.exercises[0].sets[0].reps == 8)
+        #expect(viewModel.editingSetID == nil)
+        #expect(storage.saveCallCount == 0)
+    }
+
+    @Test func saveFailureDuringEditKeepsChangeInMemory() throws {
+        let storage = FailingWorkoutStorage()
+        let viewModel = makeViewModel(storage: storage)
+        let setID = try logOneBenchSet(viewModel)
+
+        storage.saveFails = true
+        viewModel.beginEdit(setID: setID)
+        viewModel.editRepsText = "8"
+        viewModel.saveEdit()
+
+        #expect(viewModel.activeWorkout?.exercises[0].sets[0].reps == 8)
+        #expect(viewModel.storageErrorMessage != nil)
+        #expect(viewModel.editingSetID == nil)
+    }
+
+    @Test func editingLastSetLeavesOpenSetBoxesUnchanged() throws {
+        let counter = FakeRepCounter()
+        let viewModel = makeViewModel(counter: counter)
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
+        let setID = try #require(viewModel.activeWorkout?.exercises[0].sets.last?.id)
+        viewModel.beginSet(for: exerciseID)
+        let callsBefore = counter.calls
+
+        viewModel.beginEdit(setID: setID)
+        viewModel.editWeightText = "225"
+        viewModel.editRepsText = "3"
+        viewModel.saveEdit()
+
+        #expect(viewModel.setPhase == .enteringReps(exerciseID: exerciseID))
+        #expect(viewModel.weightText == "135")
+        #expect(viewModel.repsText == "5")
+        #expect(viewModel.inputErrorMessage == nil)
+        #expect(counter.calls == callsBefore)
+    }
+
+    @Test func nextSetPrefillsFromEditedSet() throws {
+        let viewModel = makeViewModel()
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
+        let setID = try #require(viewModel.activeWorkout?.exercises[0].sets.last?.id)
+
+        viewModel.beginEdit(setID: setID)
+        viewModel.editWeightText = "225"
+        viewModel.editRepsText = "3"
+        viewModel.saveEdit()
+        viewModel.beginSet(for: exerciseID)
+
+        #expect(viewModel.weightText == "225")
+        #expect(viewModel.repsText == "3")
+    }
+
+    @Test func saveEditAfterSetIsDeletedChangesNothing() throws {
+        let storage = FailingWorkoutStorage()
+        let viewModel = makeViewModel(storage: storage)
+        let setID = try logOneBenchSet(viewModel)
+        viewModel.beginEdit(setID: setID)
+
+        viewModel.deleteSet(id: setID)
+        #expect(viewModel.editingSet == nil)
+        let savesBefore = storage.saveCallCount
+        viewModel.saveEdit()
+
+        #expect(viewModel.editingSetID == nil)
+        #expect(viewModel.activeWorkout?.totalSets == 0)
+        #expect(storage.saveCallCount == savesBefore)
+    }
+
+    @Test func saveEditAfterExerciseIsDeletedChangesNothing() throws {
+        let storage = FailingWorkoutStorage()
+        let viewModel = makeViewModel(storage: storage)
+        let setID = try logOneBenchSet(viewModel)
+        let exerciseID = try #require(viewModel.activeWorkout?.exercises[0].id)
+        viewModel.beginEdit(setID: setID)
+
+        viewModel.deleteExercise(id: exerciseID)
+        #expect(viewModel.editingSet == nil)
+        let savesBefore = storage.saveCallCount
+        viewModel.saveEdit()
+
+        #expect(viewModel.editingSetID == nil)
+        #expect(viewModel.activeWorkout?.exercises.isEmpty == true)
+        #expect(storage.saveCallCount == savesBefore)
+    }
+
+    @Test func saveEditAfterWorkoutIsDeletedChangesNothing() throws {
+        let storage = FailingWorkoutStorage()
+        let viewModel = makeViewModel(storage: storage)
+        let setID = try logOneBenchSet(viewModel)
+        let workoutID = try #require(viewModel.activeWorkout?.id)
+        viewModel.beginEdit(setID: setID)
+
+        viewModel.deleteWorkout(id: workoutID)
+        #expect(viewModel.editingSet == nil)
+        let savesBefore = storage.saveCallCount
+        viewModel.saveEdit()
+
+        #expect(viewModel.editingSetID == nil)
+        #expect(viewModel.workouts.isEmpty)
+        #expect(storage.saveCallCount == savesBefore)
+    }
+
+    @Test func editDoesNotKeepForgottenWorkoutAlive() throws {
+        let clock = TestClock(now: fixedDate)
+        let viewModel = WorkoutViewModel(storage: InMemoryWorkoutStorage(), repCounter: FakeRepCounter(), now: { clock.now })
+        let setID = try logOneBenchSet(viewModel)
+
+        clock.now = fixedDate.addingTimeInterval(cutoff - 60)
+        viewModel.beginEdit(setID: setID)
+        viewModel.editRepsText = "6"
+        viewModel.saveEdit()
+        clock.now = fixedDate.addingTimeInterval(cutoff + 1)
+        viewModel.endForgottenWorkout()
+
+        #expect(viewModel.activeWorkout == nil)
+        #expect(viewModel.workouts.first?.endedAt == fixedDate)
+        #expect(viewModel.workouts.first?.exercises[0].sets[0].reps == 6)
+    }
+
     // MARK: - Deleting
 
     @Test func deleteSetRemovesOnlyThatSet() throws {

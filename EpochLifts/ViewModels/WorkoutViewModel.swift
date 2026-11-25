@@ -4,7 +4,7 @@ import os
 import WorkoutCore
 
 /// Screen state and actions for logging workouts: starting and ending a workout, adding
-/// exercises, logging sets and deleting history (ADR-002, ADR-011).
+/// exercises, logging sets, and editing and deleting history (ADR-002, ADR-011).
 ///
 /// Reps always come from the injected `RepCountingService`, so the same ViewModel works
 /// with manual input, the Apple Watch or a replayed recording.
@@ -44,6 +44,20 @@ final class WorkoutViewModel {
     /// Shown when the weight or reps box holds an invalid value.
     private(set) var inputErrorMessage: String?
 
+    /// The ID of the saved set the edit was opened on, or `nil` once it is saved or cancelled.
+    /// It can name a set deleted mid-edit; use `editingSet` to tell whether an edit is open.
+    private(set) var editingSetID: UUID?
+
+    /// Text in the edit's weight box, in pounds. Separate from `weightText` so an edit never
+    /// changes the set being logged.
+    var editWeightText = ""
+
+    /// Text in the edit's reps box.
+    var editRepsText = ""
+
+    /// Shown when the edit's weight or reps box holds an invalid value.
+    private(set) var editErrorMessage: String?
+
     /// Shown when saved workouts couldn't be read or a save failed.
     private(set) var storageErrorMessage: String?
 
@@ -80,6 +94,9 @@ final class WorkoutViewModel {
     /// How long after its last activity an active workout counts as forgotten. The reason
     /// for four hours is in ADR-011.
     static let forgottenWorkoutCutoff: TimeInterval = 4 * 60 * 60
+
+    private static let invalidWeightMessage = "Enter a weight of 0 or more (0 means bodyweight)."
+    private static let invalidRepsMessage = "Enter reps as a whole number, 1 or more."
 
     private let storage: any WorkoutStorage
     private let repCounter: any RepCountingService
@@ -200,11 +217,11 @@ final class WorkoutViewModel {
         guard case .enteringReps(let exerciseID) = setPhase else { return }
 
         guard let weightLb = SetInput.weightLb(from: weightText) else {
-            inputErrorMessage = "Enter a weight of 0 or more (0 means bodyweight)."
+            inputErrorMessage = Self.invalidWeightMessage
             return
         }
         guard let reps = SetInput.reps(from: repsText) else {
-            inputErrorMessage = "Enter reps as a whole number, 1 or more."
+            inputErrorMessage = Self.invalidRepsMessage
             return
         }
         guard let workoutIndex = activeWorkoutIndex,
@@ -231,6 +248,60 @@ final class WorkoutViewModel {
         guard setPhase != .notStarted else { return }
         repCounter.stopCounting()
         clearSet()
+    }
+
+    // MARK: - Editing saved sets
+
+    /// The saved set being edited, or `nil` when no edit is open or the set no longer exists.
+    var editingSet: LoggedSet? {
+        guard let setID = editingSetID, let position = findSet(id: setID) else { return nil }
+        return workouts[position.workoutIndex].exercises[position.exerciseIndex].sets[position.setIndex]
+    }
+
+    /// Opens an edit of a saved set in any workout, filling the edit boxes from it.
+    /// Replaces an edit that is already open. Does nothing if no set has this ID.
+    ///
+    /// Edits change the saved set directly, without the rep counter, so they never affect
+    /// the set being logged (ADR-011).
+    func beginEdit(setID: UUID) {
+        guard let position = findSet(id: setID) else { return }
+        let set = workouts[position.workoutIndex].exercises[position.exerciseIndex].sets[position.setIndex]
+        editingSetID = setID
+        editWeightText = SetInput.text(forWeightLb: set.weightLb)
+        editRepsText = String(set.reps)
+        editErrorMessage = nil
+    }
+
+    /// Validates the edit boxes like `completeSet()`, then changes the set's weight and reps
+    /// and saves. Its ID, completion time and rep source never change. If the set was deleted
+    /// while editing, the edit closes without changing or saving anything.
+    func saveEdit() {
+        guard let setID = editingSetID else { return }
+        guard let position = findSet(id: setID) else {
+            cancelEdit()
+            return
+        }
+        guard let weightLb = SetInput.weightLb(from: editWeightText) else {
+            editErrorMessage = Self.invalidWeightMessage
+            return
+        }
+        guard let reps = SetInput.reps(from: editRepsText) else {
+            editErrorMessage = Self.invalidRepsMessage
+            return
+        }
+
+        workouts[position.workoutIndex].exercises[position.exerciseIndex].sets[position.setIndex].weightLb = weightLb
+        workouts[position.workoutIndex].exercises[position.exerciseIndex].sets[position.setIndex].reps = reps
+        save()
+        cancelEdit()
+    }
+
+    /// Closes the edit without changing anything.
+    func cancelEdit() {
+        editingSetID = nil
+        editWeightText = ""
+        editRepsText = ""
+        editErrorMessage = nil
     }
 
     // MARK: - Deleting
@@ -293,6 +364,18 @@ final class WorkoutViewModel {
 
     private func loggedExercise(id: UUID) -> LoggedExercise? {
         activeWorkout?.exercises.first { $0.id == id }
+    }
+
+    /// Where the saved set with this ID is, in any workout, or `nil` if it doesn't exist.
+    private func findSet(id: UUID) -> (workoutIndex: Int, exerciseIndex: Int, setIndex: Int)? {
+        for workoutIndex in workouts.indices {
+            for exerciseIndex in workouts[workoutIndex].exercises.indices {
+                if let setIndex = workouts[workoutIndex].exercises[exerciseIndex].sets.firstIndex(where: { $0.id == id }) {
+                    return (workoutIndex, exerciseIndex, setIndex)
+                }
+            }
+        }
+        return nil
     }
 
     /// Resets the counter and the input boxes after a set is saved or cancelled.
