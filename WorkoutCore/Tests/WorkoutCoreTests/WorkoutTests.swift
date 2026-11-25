@@ -53,6 +53,22 @@ struct WorkoutTests {
         #expect(Workout(startedAt: start).totalSets == 0)
     }
 
+    @Test func lastActivityIsLatestSetAcrossExercises() {
+        func set(at date: Date) -> LoggedSet {
+            LoggedSet(reps: 5, weightLb: 135, completedAt: date, repSource: .manual)
+        }
+        let latest = start.addingTimeInterval(1800)
+        let bench = LoggedExercise(exercise: ExerciseType.defaults[0], sets: [set(at: latest)])
+        let squat = LoggedExercise(exercise: ExerciseType.defaults[1], sets: [set(at: start.addingTimeInterval(600))])
+        let workout = Workout(startedAt: start, exercises: [bench, squat])
+        #expect(workout.lastActivityAt == latest)
+    }
+
+    @Test func lastActivityIsStartWhenThereAreNoSets() {
+        let bench = LoggedExercise(exercise: ExerciseType.defaults[0])
+        #expect(Workout(startedAt: start, exercises: [bench]).lastActivityAt == start)
+    }
+
     @Test func jsonRoundTripKeepsEverything() throws {
         let bench = LoggedExercise(
             exercise: ExerciseType.defaults[0],

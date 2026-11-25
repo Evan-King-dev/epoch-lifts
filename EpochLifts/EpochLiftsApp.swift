@@ -5,10 +5,16 @@ import WorkoutCore
 /// created and wired together.
 @main struct EpochLiftsApp: App {
     @State private var viewModel = EpochLiftsApp.makeWorkoutViewModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
             WorkoutListView(viewModel: viewModel)
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                viewModel.endForgottenWorkout()
+            }
         }
     }
 

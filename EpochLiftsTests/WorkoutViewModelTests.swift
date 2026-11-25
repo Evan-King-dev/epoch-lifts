@@ -24,6 +24,11 @@ struct WorkoutViewModelTests {
         return try #require(viewModel.activeWorkout?.exercises.last?.id)
     }
 
+    /// A bench press set of 135 lb completed at `completedAt`.
+    func benchSet(reps: Int = 5, completedAt: Date) -> LoggedSet {
+        LoggedSet(reps: reps, weightLb: 135, completedAt: completedAt, repSource: .manual)
+    }
+
     /// Logs one full set through the normal flow. Works with manual and sensor counters:
     /// steps that don't apply to the current phase do nothing.
     func logSet(_ viewModel: WorkoutViewModel, exerciseID: UUID, weight: String, reps: String) {
@@ -53,6 +58,7 @@ struct WorkoutViewModelTests {
     @Test func loadFailureShowsErrorAndNeverSaves() {
         let storage = FailingWorkoutStorage(loadFails: true)
         let viewModel = makeViewModel(storage: storage)
+        #expect(storage.saveCallCount == 0)
 
         viewModel.startWorkout()
         viewModel.addExercise(bench)
@@ -95,6 +101,100 @@ struct WorkoutViewModelTests {
         #expect(viewModel.activeWorkout?.exercises[0].sets.count == 1)
         #expect(viewModel.storageErrorMessage != nil)
         #expect(viewModel.setPhase == .notStarted)
+    }
+
+    // MARK: - Forgotten workouts
+
+    /// An active workout that started 6 hours before `fixedDate`, with one bench press set per date given.
+    func makeActiveWorkout(setsCompletedAt dates: [Date]) -> Workout {
+        Workout(
+            startedAt: fixedDate.addingTimeInterval(-6 * 60 * 60),
+            exercises: [LoggedExercise(exercise: bench, sets: dates.map { benchSet(completedAt: $0) })]
+        )
+    }
+
+    var cutoff: TimeInterval { WorkoutViewModel.forgottenWorkoutCutoff }
+
+    @Test func workoutWithLastSetJustUnderCutoffStaysActive() {
+        let workout = makeActiveWorkout(setsCompletedAt: [fixedDate.addingTimeInterval(-cutoff + 1)])
+        let viewModel = makeViewModel(storage: InMemoryWorkoutStorage(workouts: [workout]))
+
+        #expect(viewModel.activeWorkout == workout)
+    }
+
+    @Test func workoutWithLastSetJustOverCutoffEndsAtLastSetAndSaves() {
+        let lastSetDate = fixedDate.addingTimeInterval(-cutoff - 1)
+        let workout = makeActiveWorkout(setsCompletedAt: [lastSetDate.addingTimeInterval(-600), lastSetDate])
+        let storage = InMemoryWorkoutStorage(workouts: [workout])
+        let viewModel = makeViewModel(storage: storage)
+
+        #expect(viewModel.activeWorkout == nil)
+        #expect(viewModel.workouts.first?.endedAt == lastSetDate)
+        #expect(storage.loadWorkouts() == viewModel.workouts)
+    }
+
+    @Test func workoutWithNoSetsStartedJustUnderCutoffStaysActive() {
+        let workout = Workout(startedAt: fixedDate.addingTimeInterval(-cutoff + 1))
+        let viewModel = makeViewModel(storage: InMemoryWorkoutStorage(workouts: [workout]))
+
+        #expect(viewModel.activeWorkout == workout)
+    }
+
+    @Test func forgottenWorkoutWithNoSetsIsDeletedAndSaved() {
+        let workout = Workout(startedAt: fixedDate.addingTimeInterval(-cutoff - 1))
+        let storage = InMemoryWorkoutStorage(workouts: [workout])
+        let viewModel = makeViewModel(storage: storage)
+
+        #expect(viewModel.workouts.isEmpty)
+        #expect(storage.loadWorkouts().isEmpty)
+    }
+
+    @Test func workoutThatBecomesForgottenAfterLoadEndsWhenCheckedAgain() throws {
+        let clock = TestClock(now: fixedDate)
+        let storage = InMemoryWorkoutStorage()
+        let viewModel = WorkoutViewModel(storage: storage, repCounter: FakeRepCounter(), now: { clock.now })
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
+
+        clock.now = fixedDate.addingTimeInterval(cutoff - 1)
+        viewModel.endForgottenWorkout()
+        #expect(viewModel.activeWorkout != nil)
+
+        clock.now = fixedDate.addingTimeInterval(cutoff + 1)
+        viewModel.endForgottenWorkout()
+        #expect(viewModel.activeWorkout == nil)
+        #expect(viewModel.workouts.first?.endedAt == fixedDate)
+        #expect(storage.loadWorkouts() == viewModel.workouts)
+    }
+
+    @Test func endingForgottenWorkoutDiscardsUnfinishedSet() throws {
+        let clock = TestClock(now: fixedDate)
+        let viewModel = WorkoutViewModel(storage: InMemoryWorkoutStorage(), repCounter: FakeRepCounter(), now: { clock.now })
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
+        viewModel.beginSet(for: exerciseID)
+
+        clock.now = fixedDate.addingTimeInterval(cutoff + 1)
+        viewModel.endForgottenWorkout()
+
+        #expect(viewModel.setPhase == .notStarted)
+        #expect(viewModel.workouts.first?.totalSets == 1)
+    }
+
+    @Test func endingForgottenWorkoutLeavesEndedWorkoutsUnchanged() {
+        let oldSet = fixedDate.addingTimeInterval(-3 * 24 * 60 * 60)
+        let ended = Workout(
+            startedAt: oldSet.addingTimeInterval(-600),
+            endedAt: oldSet.addingTimeInterval(600),
+            exercises: [LoggedExercise(exercise: bench, sets: [benchSet(completedAt: oldSet)])]
+        )
+        let lastSetDate = fixedDate.addingTimeInterval(-cutoff - 1)
+        let forgotten = makeActiveWorkout(setsCompletedAt: [lastSetDate])
+        let viewModel = makeViewModel(storage: InMemoryWorkoutStorage(workouts: [ended, forgotten]))
+
+        #expect(viewModel.workouts.count == 2)
+        #expect(viewModel.workouts.first == ended)
+        #expect(viewModel.workouts.last?.endedAt == lastSetDate)
     }
 
     // MARK: - Workouts
@@ -470,7 +570,7 @@ struct WorkoutViewModelTests {
 
     /// An ended workout with one bench press exercise holding the given rep counts as sets.
     func pastWorkout(reps: [Int]) -> Workout {
-        let sets = reps.map { LoggedSet(reps: $0, weightLb: 135, completedAt: fixedDate, repSource: .manual) }
+        let sets = reps.map { benchSet(reps: $0, completedAt: fixedDate) }
         return Workout(
             startedAt: fixedDate,
             endedAt: fixedDate.addingTimeInterval(3600),

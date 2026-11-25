@@ -65,3 +65,12 @@ final class FailingWorkoutStorage: WorkoutStorage {
         if saveFails { throw StorageFailure() }
     }
 }
+
+/// A clock a test can move forward, for code that reads the current time more than once.
+final class TestClock {
+    var now: Date
+
+    init(now: Date) {
+        self.now = now
+    }
+}
