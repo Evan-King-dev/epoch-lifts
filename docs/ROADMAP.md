@@ -118,7 +118,7 @@ These continue the numbering of ADR-001 to 011 in DESIGN.md.
 - When the phone is unreachable, the Watch runs the set itself and keeps the finished set, with its UUID, until the phone confirms it. The phone confirms a set only after it has been saved successfully: never while saving is off after a failed load, and not after a failed save. Unconfirmed sets stay on the Watch and are sent again. Offline sets are added to history as they arrive, without the correction step, and can be deleted afterwards like any set. They are added through a separate path that never changes the phone's set in progress (`setPhase`, `weightText`, `repsText`).
 - An offline set carries its UUID, the workout ID, the `LoggedExercise` ID, reps and `completedAt`. If the exercise was added on the Watch, the Watch creates the `LoggedExercise` ID when the exercise is added and also sends its `ExerciseType`; the phone adds that exercise to the workout only if its ID isn't there yet. The phone fills in the weight: the previous set of that exercise in the workout, as in ADR-011's pre-fill; otherwise the most recent weight for that `ExerciseType` in history; otherwise 0. Sets that arrive together are added in `completedAt` order, so each one sees the sets before it.
 - Offline sets pass the same validation as `completeSet`: reps 1 or more, weight 0 or more.
-- An offline set that fails validation, or whose workout no longer exists on the phone, is dropped and logged, and its ID is still recorded so resends are ignored. The Watch can't start a workout while the phone is unreachable, so a missing workout always means one the user deleted.
+- An offline set that fails validation, or whose workout no longer exists on the phone, is dropped and logged, and its ID is still recorded so resends are ignored. The Watch can't start a workout while the phone is unreachable. A missing workout means it was deleted on the phone, by the user or by the forgotten-workout rule.
 - The phone keeps the IDs of every offline set it has received, and ignores any incoming set whose UUID is already in history or in that list. Resending is always safe and a deleted set never comes back.
 - A set that is ignored as a duplicate or dropped is still confirmed, once the history and received IDs are saved, so the Watch stops resending it.
 - If the Watch disconnects mid-set: `beginSet` creates the set's UUID and sends it to the Watch. If the Watch finishes that set offline, it keeps that UUID. When the phone receives a set whose UUID matches its own set in progress, it cancels its copy and adds the Watch's. This means `LoggedSet` IDs are created in `beginSet`, not `completeSet`.
@@ -130,6 +130,8 @@ These continue the numbering of ADR-001 to 011 in DESIGN.md.
 - Both devices keep full copies and merge: most flexible offline, but needs conflict rules, which is a sync engine.
 
 **Consequences:** Watch sets made with the phone reachable use the same path as manual sets, so the core requirement holds for the main source. Offline sets are the one path that skips `completeSet`. `WorkoutStorage` changes: load and save carry the workouts and the received offline set IDs as one value, saved atomically together in the workouts file (ADR-008), so the two can never disagree. The Watch app can't show history beyond the current workout.
+
+**Open:** the forgotten-workout rule must not delete a workout that may still receive offline Watch sets; late sets for an ended workout are added to it.
 
 ### ADR-016: Rep counter chosen per set
 
