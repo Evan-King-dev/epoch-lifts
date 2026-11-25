@@ -28,10 +28,10 @@ public final class ManualRepCounter: RepCountingService {
     // Sensor counters use them to start and stop motion updates; manual counting has
     // no sensor, so they do nothing here.
 
-    /// Does nothing: manual counting has no sensor to start.
+    /// Does nothing.
     public func startCounting() {}
 
-    /// Does nothing: manual counting has no sensor to stop.
+    /// Does nothing.
     public func stopCounting() {}
 
     public func reset() {

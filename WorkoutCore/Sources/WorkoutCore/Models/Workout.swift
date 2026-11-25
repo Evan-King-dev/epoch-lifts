@@ -31,7 +31,7 @@ public struct Workout: Codable, Hashable, Identifiable, Sendable {
 
     /// Total number of sets across all exercises.
     public var totalSets: Int {
-        exercises.reduce(0) { total, session in total + session.sets.count }
+        exercises.reduce(0) { total, exercise in total + exercise.sets.count }
     }
 
     /// Elapsed time in seconds. For an active workout, measured up to `now`.
