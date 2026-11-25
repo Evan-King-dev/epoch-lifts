@@ -263,7 +263,7 @@ ADR-012 to 017 are proposed; see [ROADMAP.md](ROADMAP.md).
 - ViewModels are tested with a fake rep counter and `InMemoryWorkoutStorage`.
 - Persistence is tested by saving and reloading data.
 - Rep detection is tested by running the detection function directly on recorded motion files.
-- CI runs the tests on every push.
+- CI (GitHub Actions) runs the package and app tests on pull requests and pushes to main.
 
 ## 5. Build order
 
