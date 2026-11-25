@@ -142,9 +142,10 @@ final class WorkoutViewModel {
     // MARK: - Sets
 
     /// Starts a set for an exercise in the workout in progress and starts the rep counter.
-    /// Pre-fills the weight box with the previous set's weight for that exercise.
+    /// Pre-fills the weight box with the previous set's weight for that exercise; the reps box
+    /// is pre-filled by `finishSet()`.
     /// A manual counter has nothing to count during the set, so the set goes straight to
-    /// entering weight and reps (ADR-011).
+    /// entering weight and reps (ADR-011), with both boxes pre-filled.
     func beginSet(for exerciseID: UUID) {
         guard setPhase == .notStarted,
               let exercise = activeWorkout?.exercises.first(where: { $0.id == exerciseID })

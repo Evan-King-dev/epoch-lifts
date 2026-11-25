@@ -35,8 +35,10 @@ public struct Workout: Codable, Hashable, Identifiable, Sendable {
     }
 
     /// Elapsed time in seconds. For an active workout, measured up to `now`.
+    /// Never negative: returns 0 if the end time (or `now`) is before the start, for example
+    /// after the device clock is set back.
     /// - Parameter now: The current time. Injectable so tests can use a fixed date.
     public func duration(now: Date = .now) -> TimeInterval {
-        (endedAt ?? now).timeIntervalSince(startedAt)
+        max(0, (endedAt ?? now).timeIntervalSince(startedAt))
     }
 }

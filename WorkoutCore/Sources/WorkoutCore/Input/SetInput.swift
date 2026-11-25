@@ -27,6 +27,8 @@ public enum SetInput {
 
     /// Formats a weight for the weight box, without a trailing ".0" for whole numbers.
     /// Example: `225.0` becomes `"225"`, `22.5` stays `"22.5"`.
+    /// Only whole numbers under 1,000,000 go through `Int`: `Int(weight)` traps on values
+    /// outside `Int`'s range, such as infinity. Anything else is formatted as a `Double`.
     public static func text(forWeightLb weight: Double) -> String {
         if weight == weight.rounded(), abs(weight) < 1_000_000 {
             return String(Int(weight))
