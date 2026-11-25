@@ -249,9 +249,10 @@ struct RepEvent: Sendable {
 - Manual counters skip the lifting phase: there is nothing to count during the set, so `beginSet` goes straight to the weight and reps boxes. The ViewModel decides this from the counter's `sourceType`, never its concrete type.
 - Validation: weight is 0 or more (0 = bodyweight); reps are a whole number of 1 or more.
 - Pre-fill from the previous set of the same exercise in this workout: weight always, reps only when the counter reads 0, so a sensor count is never replaced.
+- Editing a saved set changes its weight and reps directly, without the counter or changing `repSource`; the counter's correction (ADR-009) is only for the set in progress.
 - After a failed load, saving is off for the session (ADR-008).
 - An ended workout with no sets is deleted, so history never holds an empty entry.
-- Forgotten workouts: on load and whenever the app returns to the foreground, an active workout whose last activity (its latest set, or its start if it has no sets) is more than 4 hours old is ended at that time. Adding an exercise does not count as activity. Four hours is longer than any real rest between sets but short enough to end a forgotten workout before the next day's, and ending at the last activity keeps the duration real.
+- Forgotten workouts: on load and whenever the app returns to the foreground, an active workout whose last activity (its latest set, or its start if it has no sets) is more than 4 hours old is ended at that time. Adding an exercise does not count as activity, nor does editing a set. Four hours is longer than any real rest between sets but short enough to end a forgotten workout before the next day's, and ending at the last activity keeps the duration real.
 
 **Alternatives:** ViewModel in `WorkoutCore` (faster tests, but iPhone state in the shared package and `public` everywhere); no pre-fill (simpler, but most sets repeat the last one); asking on launch whether to end an old workout (an extra prompt for a case with one sensible answer); Start and Finish for every source (one flow, but two extra taps per manual set for nothing).
 
