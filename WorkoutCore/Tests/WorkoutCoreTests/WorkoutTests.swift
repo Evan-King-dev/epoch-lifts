@@ -31,6 +31,17 @@ struct WorkoutTests {
         #expect(workout.duration(now: now) == 90)
     }
 
+    @Test func durationIsZeroWhenNowIsBeforeStart() {
+        let workout = Workout(startedAt: start)
+        let now = start.addingTimeInterval(-60)
+        #expect(workout.duration(now: now) == 0)
+    }
+
+    @Test func durationIsZeroWhenEndIsBeforeStart() {
+        let workout = Workout(startedAt: start, endedAt: start.addingTimeInterval(-60))
+        #expect(workout.duration() == 0)
+    }
+
     @Test func totalSetsCountsAcrossExercises() {
         let bench = LoggedExercise(exercise: ExerciseType.defaults[0], sets: [makeSet(), makeSet(), makeSet()])
         let squat = LoggedExercise(exercise: ExerciseType.defaults[1], sets: [makeSet(), makeSet()])
