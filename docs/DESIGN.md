@@ -28,10 +28,10 @@ Views → ViewModels → Services / Persistence → Models
 
 | Layer | Responsibility |
 |---|---|
-| Models | `Codable` data and pure logic on it (`Workout.duration`, `totalSets`) |
-| Services | Rep counting, exercise library |
+| Models | `Codable` data, the built-in exercise catalogue (`ExerciseType.defaults`), and pure logic on it (`Workout.duration`, `totalSets`) |
+| Services | Rep counting |
 | Persistence | Saving and loading workouts behind a protocol |
-| ViewModels | Screen state, input parsing and validation, business rules, service calls |
+| ViewModels | Screen state, input validation, business rules, service calls; input parsing is in `SetInput` (ADR-011) |
 | Views | Layout and display; forward user actions to the ViewModel |
 
 Dependencies point one way. Models do not know about services, services do not know about views, and ViewModels do not import SwiftUI.
@@ -86,6 +86,7 @@ Dependencies are passed in through `init`. Real implementations are created in o
 - `@Observable` instead of `ObservableObject`. Views update only when the properties they read change, which matters when sensor data arrives several times a second. Nested observable objects also work correctly.
 - Swift 6 language mode with strict concurrency from the start. Sensor callbacks, Watch messages and UI updates run on different threads, and the compiler catches data races. Enabling it later in a larger codebase is costly.
 - `AsyncStream` for rep events instead of Combine. It fits Swift concurrency and wraps callback-based APIs easily.
+- The app target keeps Xcode's default `MainActor` isolation: almost all app code is UI-bound, so it needs no annotations. `WorkoutCore` and the test target keep `nonisolated` as the default and mark main-actor code explicitly (`@MainActor` on `RepCountingService` and the ViewModel tests), because the package is shared with the Watch and its logic shouldn't be tied to the main actor.
 
 #### ADR-004: iPhone only, iOS 17 minimum
 
@@ -186,7 +187,7 @@ Workout                              one gym visit
 - A missing file loads as an empty list. A corrupt file, or one with a newer `formatVersion`, throws and is left untouched.
 - Saves are atomic: the file is written in full to a temporary location, then swapped in.
 
-**Consequences:** A later move to SwiftData is a new implementation of the same protocol.
+**Consequences:** A database such as SwiftData would only be worth it if history becomes too large to load and save whole, or needs queries; that would change the protocol, not just add an implementation.
 
 #### ADR-009: One protocol for all rep sources
 
@@ -264,7 +265,7 @@ ADR-012 to 017 are proposed; see [ROADMAP.md](ROADMAP.md).
 - Layers are built bottom-up. Each step ends with passing tests and a commit.
 - ViewModels are tested with a fake rep counter and `InMemoryWorkoutStorage`.
 - Persistence is tested by saving and reloading data.
-- Rep detection is tested by running the detection function directly on recorded motion files.
+- From V0.2, rep detection is tested by running the detection function directly on recorded motion files.
 - CI (GitHub Actions) runs the package and app tests on pull requests and pushes to main.
 
 ## 5. Build order

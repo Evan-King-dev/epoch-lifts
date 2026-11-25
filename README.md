@@ -43,10 +43,10 @@ Views  →  ViewModels  →  Services / Persistence  →  Models
 
 - **MVVM**, with dependencies pointing one way only. ViewModels never import SwiftUI.
 - **Every rep source implements one protocol**, `RepCountingService`, and emits `RepEvent`s:
-  `ManualRepCounter` · `WatchRepCounter` · `ReplayRepCounter` · test fakes
+  `ManualRepCounter` · test fakes; `WatchRepCounter` and `ReplayRepCounter` planned (V0.2)
 - **Composition root:** all real implementations are wired together in one place, so a new rep source or storage backend needs no changes to views or ViewModels.
-- **Shared Swift package (`WorkoutCore`)** holds the models and rep-detection code used by both the iOS and watchOS apps.
-- **Edge processing on the Watch:** rep detection runs on the Watch and sends small `RepEvent`s to the phone live. The raw ~100 Hz motion recording transfers after each set.
+- **Shared Swift package (`WorkoutCore`)** holds the models, persistence, rep counting and input parsing, and later the rep-detection code, for both the iOS and watchOS apps.
+- **Edge processing on the Watch (planned, V0.2):** rep detection runs on the Watch and sends small `RepEvent`s to the phone live. The raw ~100 Hz motion recording transfers after each set.
 
 ```
 Watch                                            iPhone
@@ -66,7 +66,7 @@ Full reasoning for each design choice: **[docs/DESIGN.md](docs/DESIGN.md)**
 - **watchOS**, **CoreMotion**, **HealthKit** (`HKWorkoutSession`), **WatchConnectivity**: *planned*
 - **Core ML**, **Create ML**; Python + scikit-learn for model prototyping: *planned*
 - **Swift Testing** unit tests; GitHub Actions CI on pull requests and pushes to main
-- Persistence: Codable JSON file store behind a repository protocol (SwiftData migration planned)
+- Persistence: Codable JSON file store behind a repository protocol
 
 ---
 
@@ -100,7 +100,7 @@ Versions, planned features and proposed design decisions: **[docs/ROADMAP.md](do
 
 ```
 EpochLifts/            iOS app: views and ViewModels
-EpochLiftsTests/       ViewModel tests (run in the iOS simulator)
+EpochLiftsTests/       App tests: ViewModel, wiring and formatting (run in the iOS simulator)
 EpochLiftsWatch/       watchOS app (planned)
 WorkoutCore/           Shared Swift package: models, persistence, rep counting, input parsing; rep detection (planned)
 docs/                  Design notes and decision records
