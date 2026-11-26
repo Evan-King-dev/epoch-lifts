@@ -8,10 +8,13 @@ struct ExerciseTypeTests {
     @Test func defaultIDsNeverChange() {
         let ids = ExerciseType.defaults.map(\.id)
         #expect(ids == [
-            "bench-press", "incline-bench-press", "overhead-press",
-            "barbell-row", "lat-pulldown", "pull-up",
-            "back-squat", "deadlift", "romanian-deadlift", "leg-press",
-            "bicep-curl", "tricep-pushdown",
+            "bench-press", "incline-bench-press", "machine-chest-press", "pec-deck",
+            "tricep-pushdown", "single-arm-tricep-pushdown", "jm-press",
+            "lat-pulldown", "machine-high-row",
+            "dumbbell-bicep-curl", "preacher-curl", "cable-curl",
+            "machine-shoulder-press", "cable-lateral-raise",
+            "back-squat", "leg-press", "leg-extension",
+            "romanian-deadlift", "leg-curl", "calf-raise",
         ])
     }
 
