@@ -175,7 +175,7 @@ Workout                              one gym visit
 
 **Context:** The first version stored workouts as JSON in `UserDefaults`, which is intended for small settings. Workout history grows without limit.
 
-**Decision:** A `WorkoutStorage` protocol with two implementations: `FileWorkoutStorage`, a JSON file in the app's Documents folder, and `InMemoryWorkoutStorage` for tests and previews.
+**Decision:** A `WorkoutStorage` protocol with two implementations: `FileWorkoutStorage`, a JSON file in the app's Application Support folder, and `InMemoryWorkoutStorage` for tests and previews. Application Support rather than Documents: once file sharing is turned on, Documents becomes visible and deletable in the Files app. Both folders are backed up.
 
 **Rules:**
 - The saved file includes a `formatVersion` so older formats can be migrated.
