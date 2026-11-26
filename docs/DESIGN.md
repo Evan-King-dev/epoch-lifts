@@ -248,7 +248,7 @@ struct RepEvent: Sendable {
 - Set flow: `beginSet` → `finishSet` → `completeSet` or `cancelSet`. `completeSet` passes the typed reps to `correctCount(to:)` and saves the counter's `count` (ADR-009), so there is no separate correction step.
 - Manual counters skip the lifting phase: there is nothing to count during the set, so `beginSet` goes straight to the weight and reps boxes. The ViewModel decides this from the counter's `sourceType`, never its concrete type.
 - Validation: weight is 0 or more (0 = bodyweight); reps are a whole number of 1 or more.
-- Pre-fill from the previous set of the same exercise in this workout: weight always, reps only when the counter reads 0, so a sensor count is never replaced.
+- Pre-fill from the most recent set of the same `ExerciseType` in this workout: weight always, reps only when the counter reads 0, so a sensor count is never replaced. A workout may contain the same exercise more than once (the picker doesn't filter), so every copy counts.
 - Editing a saved set changes its weight and reps directly, without the counter or changing `repSource`; the counter's correction (ADR-009) is only for the set in progress.
 - After a failed load, saving is off for the session (ADR-008).
 - An ended workout with no sets is deleted, so history never holds an empty entry.

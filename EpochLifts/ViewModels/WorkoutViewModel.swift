@@ -173,8 +173,9 @@ final class WorkoutViewModel {
     // MARK: - Sets
 
     /// Starts a set for an exercise in the workout in progress and starts the rep counter.
-    /// Pre-fills the weight box with the previous set's weight for that exercise; the reps box
-    /// is pre-filled by `finishSet()`.
+    /// Pre-fills the weight box with the weight of the most recent set of the same exercise
+    /// type in this workout, from any copy of it (ADR-011); the reps box is pre-filled by
+    /// `finishSet()`.
     /// A manual counter has nothing to count during the set, so the set goes straight to
     /// entering weight and reps (ADR-011), with both boxes pre-filled.
     func beginSet(for exerciseID: UUID) {
@@ -182,7 +183,7 @@ final class WorkoutViewModel {
               let exercise = loggedExercise(id: exerciseID)
         else { return }
 
-        weightText = exercise.sets.last.map { SetInput.text(forWeightLb: $0.weightLb) } ?? ""
+        weightText = latestSet(of: exercise.exercise).map { SetInput.text(forWeightLb: $0.weightLb) } ?? ""
         repsText = ""
         inputErrorMessage = nil
 
@@ -196,14 +197,16 @@ final class WorkoutViewModel {
     }
 
     /// Stops the rep counter and fills the reps box for the user to check.
-    /// Uses the counter's count if it counted any reps, otherwise the previous set's reps.
+    /// Uses the counter's count if it counted any reps, otherwise the reps of the most recent
+    /// set of the same exercise type in this workout, from any copy of it (ADR-011).
     func finishSet() {
         guard case .lifting(let exerciseID) = setPhase else { return }
         repCounter.stopCounting()
 
         if repCounter.count > 0 {
             repsText = String(repCounter.count)
-        } else if let previousSet = loggedExercise(id: exerciseID)?.sets.last {
+        } else if let exercise = loggedExercise(id: exerciseID),
+                  let previousSet = latestSet(of: exercise.exercise) {
             repsText = String(previousSet.reps)
         } else {
             repsText = ""
@@ -364,6 +367,16 @@ final class WorkoutViewModel {
 
     private func loggedExercise(id: UUID) -> LoggedExercise? {
         activeWorkout?.exercises.first { $0.id == id }
+    }
+
+    /// The most recent set, by completion time, of this exercise type in the workout in
+    /// progress, across every copy of the exercise. Matches on the type's stable ID, so a
+    /// renamed copy still counts. Used to pre-fill the weight and reps boxes (ADR-011).
+    private func latestSet(of exerciseType: ExerciseType) -> LoggedSet? {
+        activeWorkout?.exercises
+            .filter { $0.exercise.id == exerciseType.id }
+            .flatMap(\.sets)
+            .max { $0.completedAt < $1.completedAt }
     }
 
     /// Where the saved set with this ID is, in any workout, or `nil` if it doesn't exist.

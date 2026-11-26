@@ -519,6 +519,59 @@ struct WorkoutViewModelTests {
         #expect(viewModel.repsText == "3")
     }
 
+    @Test func secondCopyOfExercisePrefillsFromFirstCopy() throws {
+        let viewModel = makeViewModel()
+        let firstCopyID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: firstCopyID, weight: "225", reps: "5")
+
+        viewModel.addExercise(bench)
+
+        #expect(viewModel.weightText == "225")
+        #expect(viewModel.repsText == "5")
+    }
+
+    @Test func latestSetByCompletedAtWinsOverLatestCopy() throws {
+        let earlier = fixedDate.addingTimeInterval(-600)
+        let later = fixedDate.addingTimeInterval(-60)
+        let firstCopy = LoggedExercise(exercise: bench, sets: [
+            LoggedSet(reps: 3, weightLb: 225, completedAt: later, repSource: .manual),
+        ])
+        let secondCopy = LoggedExercise(exercise: bench, sets: [
+            LoggedSet(reps: 8, weightLb: 185, completedAt: earlier, repSource: .manual),
+        ])
+        let workout = Workout(startedAt: earlier, exercises: [firstCopy, secondCopy])
+        let viewModel = makeViewModel(storage: InMemoryWorkoutStorage(workouts: [workout]))
+
+        viewModel.beginSet(for: secondCopy.id)
+
+        #expect(viewModel.weightText == "225")
+        #expect(viewModel.repsText == "3")
+    }
+
+    @Test func copyMatchesByExerciseTypeIDNotName() throws {
+        let renamedBench = ExerciseType(id: bench.id, name: "Flat Bench")
+        let viewModel = makeViewModel()
+        let firstCopyID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: firstCopyID, weight: "225", reps: "5")
+
+        viewModel.addExercise(renamedBench)
+
+        #expect(viewModel.weightText == "225")
+        #expect(viewModel.repsText == "5")
+    }
+
+    @Test func differentExerciseTypeIsNeverUsedForPrefill() throws {
+        let squat = try #require(ExerciseType.defaults.first { $0.id == "back-squat" })
+        let viewModel = makeViewModel()
+        let benchID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: benchID, weight: "225", reps: "5")
+
+        viewModel.addExercise(squat)
+
+        #expect(viewModel.weightText.isEmpty)
+        #expect(viewModel.repsText.isEmpty)
+    }
+
     // MARK: - Validation
 
     @Test(arguments: ["", "abc", "-5", "nan"])
