@@ -31,7 +31,7 @@ extension ExerciseType {
         ExerciseType(id: "lat-pulldown", name: "Lat Pulldown"),
         ExerciseType(id: "machine-high-row", name: "Machine High Row"),
         // Biceps
-        ExerciseType(id: "dumbbell-bicep-curl", name: "Dumbbell Bicep Curl"),
+        ExerciseType(id: "dumbbell-curl", name: "Dumbbell Curl"),
         ExerciseType(id: "preacher-curl", name: "Preacher Curl"),
         ExerciseType(id: "cable-curl", name: "Cable Curl"),
         // Shoulders

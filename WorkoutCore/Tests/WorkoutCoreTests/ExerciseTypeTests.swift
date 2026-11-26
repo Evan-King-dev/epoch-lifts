@@ -11,7 +11,7 @@ struct ExerciseTypeTests {
             "bench-press", "incline-bench-press", "machine-chest-press", "pec-deck",
             "tricep-pushdown", "single-arm-tricep-pushdown", "jm-press",
             "lat-pulldown", "machine-high-row",
-            "dumbbell-bicep-curl", "preacher-curl", "cable-curl",
+            "dumbbell-curl", "preacher-curl", "cable-curl",
             "machine-shoulder-press", "cable-lateral-raise",
             "back-squat", "leg-press", "leg-extension",
             "romanian-deadlift", "leg-curl", "calf-raise",
