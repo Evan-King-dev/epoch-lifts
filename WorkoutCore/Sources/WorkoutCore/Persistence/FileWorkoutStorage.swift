@@ -1,8 +1,11 @@
 import Foundation
 
-/// Keeps the workout history in a single JSON file, for example `Documents/workouts.json` (ADR-008).
+/// Keeps the workout history in a single JSON file, for example
+/// `Application Support/workouts.json` (ADR-008).
 public struct FileWorkoutStorage: WorkoutStorage {
-    /// Location of the JSON file. The app uses its Documents folder; tests use a temporary folder.
+    /// Location of the JSON file. The app uses its Application Support folder; tests use a
+    /// temporary folder. Changing the folder or the file name would hide existing history.
+    /// The folder is created on the first save, since iOS doesn't create Application Support.
     public let fileURL: URL
 
     public init(fileURL: URL) {
