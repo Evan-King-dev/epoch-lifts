@@ -32,7 +32,7 @@ struct LoggedSetRows: View {
     let storage = InMemoryWorkoutStorage(workouts: [Workout(startedAt: .now, exercises: [bench])])
     List {
         LoggedSetRows(
-            viewModel: WorkoutViewModel(storage: storage, repCounter: ManualRepCounter()),
+            viewModel: WorkoutViewModel(storage: storage, repCounter: ManualRepCounter(), restAlert: SilentRestAlert()),
             exercise: bench
         )
     }

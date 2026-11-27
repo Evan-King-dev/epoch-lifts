@@ -28,8 +28,8 @@ Views → ViewModels → Services / Persistence → Models
 
 | Layer | Responsibility |
 |---|---|
-| Models | `Codable` data, the built-in exercise catalogue (`ExerciseType.defaults`), pure logic on it (`Workout.duration`, `totalSets`), and the workout history rules (`WorkoutHistory`, ADR-011) |
-| Services | Rep counting |
+| Models | `Codable` data, the built-in exercise catalogue (`ExerciseType.defaults`), pure logic on it (`Workout.duration`, `totalSets`), the workout history rules (`WorkoutHistory`, ADR-011) and the rest countdown (`RestTimer`, ADR-018) |
+| Services | Rep counting, rest alerts |
 | Persistence | Saving and loading workouts behind a protocol |
 | ViewModels | Screen state, input validation, service calls; input parsing is in `SetInput` and history rules in `WorkoutHistory` (ADR-011) |
 | Views | Layout and display; forward user actions to the ViewModel |
@@ -259,6 +259,25 @@ struct RepEvent: Sendable {
 
 **Consequences:** ViewModel tests need the simulator; the history rules they rely on are also tested on the Mac. Reading `repEvents` live waits for the Watch counter in V0.2.
 
+### After V0.1
+
+#### ADR-018: Rest timer and rest alerts
+
+**Status:** Implemented
+
+**Context:** The timer's job is to pull the lifter out of other apps when rest is over, so the alert matters more than the countdown. The Watch (V0.2) will need the same timer.
+
+**Decision:**
+- `RestTimer` is a pure value type in `WorkoutCore` that stores when the rest started and ends, never a ticking count. `WorkoutViewModel` owns it.
+- The alert goes through a `RestAlert` protocol in `WorkoutCore`. `NotificationRestAlert` (a local notification with sound, also shown while the app is open) is wired in the composition root; tests use a recording fake. The Watch adds its own implementation.
+- Notification permission is asked the first time a rest is scheduled. If it is denied, the countdown is shown in the app only.
+- One rest duration for every exercise, kept in `UserDefaults`, not in the workouts file. Per-exercise rest comes with templates.
+- Rest state is never saved: if the app is closed mid-rest, the scheduled notification still fires.
+
+**Alternatives:** timer logic in the ViewModel only (simpler today, but the Watch would rewrite and retest it); the view scheduling notifications itself (no protocol, but untested logic in a view); a duration on `ExerciseType` (a model change for a choice that belongs to a workout plan).
+
+**Consequences:** The ViewModel takes one more dependency. While the phone is locked, iOS mirrors the notification to a paired Watch with no Watch code.
+
 ADR-012 to 017 are proposed; see [ROADMAP.md](ROADMAP.md).
 
 ## 4. Testing
@@ -282,5 +301,6 @@ ADR-012 to 017 are proposed; see [ROADMAP.md](ROADMAP.md).
 7. CI
 8. Edit saved sets
 9. Device testing and TestFlight
+10. Rest timer (ADR-018)
 
 V0.2 (Apple Watch): watchOS app, workout session and motion recording, file transfer, replay counter, rep detection, live rep events on the iPhone, range-of-motion validation.

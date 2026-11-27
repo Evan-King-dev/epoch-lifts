@@ -79,7 +79,7 @@ struct WorkoutDetailView: View {
     let storage = InMemoryWorkoutStorage(workouts: [past])
     NavigationStack {
         WorkoutDetailView(
-            viewModel: WorkoutViewModel(storage: storage, repCounter: ManualRepCounter()),
+            viewModel: WorkoutViewModel(storage: storage, repCounter: ManualRepCounter(), restAlert: SilentRestAlert()),
             workoutID: past.id
         )
     }

@@ -66,6 +66,16 @@ final class WorkoutViewModel {
     /// Shown when saved workouts couldn't be read or a save failed.
     private(set) var storageErrorMessage: String?
 
+    /// The rest countdown, started each time a set is saved (ADR-018). Never saved to the
+    /// workouts file: if the app is closed mid-rest, the scheduled alert still goes off.
+    private(set) var restTimer = RestTimer()
+
+    /// How long each rest lasts, in seconds. One value for every exercise, kept in the
+    /// settings store. A change applies from the next rest, not the one running.
+    var restDuration: TimeInterval {
+        didSet { settings.set(restDuration, forKey: Self.restDurationKey) }
+    }
+
     /// The workout in progress, if any.
     var activeWorkout: Workout? {
         history.activeWorkout
@@ -99,11 +109,16 @@ final class WorkoutViewModel {
     /// How long after its last activity an active workout counts as forgotten (ADR-011).
     static let forgottenWorkoutCutoff = WorkoutHistory.forgottenWorkoutCutoff
 
+    /// The settings key for `restDuration`. Changing it resets every user's chosen duration.
+    static let restDurationKey = "restDurationSeconds"
+
     private static let invalidWeightMessage = "Enter a weight of 0 or more (0 means bodyweight)."
     private static let invalidRepsMessage = "Enter reps as a whole number, 1 or more."
 
     private let storage: any WorkoutStorage
     private let repCounter: any RepCountingService
+    private let restAlert: any RestAlert
+    private let settings: UserDefaults
     private let now: () -> Date
     private let logger = Logger(subsystem: "EpochLifts", category: "WorkoutViewModel")
 
@@ -113,15 +128,24 @@ final class WorkoutViewModel {
     /// - Parameters:
     ///   - storage: Where workouts are loaded from and saved to.
     ///   - repCounter: The source of each set's rep count.
+    ///   - restAlert: Tells the user when a rest is over (ADR-018).
+    ///   - settings: Where the rest duration is kept. Tests pass an empty store.
     ///   - now: The current time. Injectable so tests can use a fixed date.
     init(
         storage: any WorkoutStorage,
         repCounter: any RepCountingService,
+        restAlert: any RestAlert,
+        settings: UserDefaults = .standard,
         now: @escaping () -> Date = { .now }
     ) {
         self.storage = storage
         self.repCounter = repCounter
+        self.restAlert = restAlert
+        self.settings = settings
         self.now = now
+        restDuration = RestTimer.clampedDuration(
+            settings.object(forKey: Self.restDurationKey) as? TimeInterval ?? RestTimer.defaultDuration
+        )
 
         do {
             history = WorkoutHistory(workouts: try storage.loadWorkouts())
@@ -142,11 +166,12 @@ final class WorkoutViewModel {
         save()
     }
 
-    /// Ends the workout in progress. An unfinished set is discarded. A workout with no
-    /// sets is deleted instead of being kept in history.
+    /// Ends the workout in progress. An unfinished set is discarded and the rest stopped.
+    /// A workout with no sets is deleted instead of being kept in history.
     func endWorkout() {
         guard history.end(at: now()) else { return }
         cancelSet()
+        skipRest()
         save()
     }
 
@@ -169,6 +194,7 @@ final class WorkoutViewModel {
         guard history.endForgottenWorkout(now: now()) else { return }
         logger.info("Ended a forgotten workout at its last activity")
         cancelSet()
+        skipRest()
         save()
     }
 
@@ -216,7 +242,8 @@ final class WorkoutViewModel {
     }
 
     /// Validates the weight and reps boxes, applies the typed reps to the counter, and saves
-    /// the set. The saved rep count is read from the counter (ADR-009).
+    /// the set. The saved rep count is read from the counter (ADR-009). Then starts a new
+    /// rest, replacing any rest still running (ADR-018).
     func completeSet() {
         guard case .enteringReps(let exerciseID) = setPhase else { return }
 
@@ -246,6 +273,7 @@ final class WorkoutViewModel {
         }
         save()
         clearSet()
+        restAlert.schedule(at: restTimer.start(at: now(), duration: restDuration))
     }
 
     /// Discards the set in progress without saving anything.
@@ -253,6 +281,16 @@ final class WorkoutViewModel {
         guard setPhase != .notStarted else { return }
         repCounter.stopCounting()
         clearSet()
+    }
+
+    // MARK: - Rest
+
+    /// Stops the rest and cancels its alert, whether or not the rest is over.
+    /// Does nothing when there is no rest.
+    func skipRest() {
+        guard restTimer.endsAt != nil else { return }
+        restTimer.stop()
+        restAlert.cancel()
     }
 
     // MARK: - Editing saved sets
@@ -308,10 +346,12 @@ final class WorkoutViewModel {
 
     // MARK: - Deleting
 
-    /// Deletes a workout. If it's the workout in progress, its unfinished set is discarded.
+    /// Deletes a workout. If it's the workout in progress, its unfinished set is discarded
+    /// and the rest stopped.
     func deleteWorkout(id: UUID) {
         if activeWorkout?.id == id {
             cancelSet()
+            skipRest()
         }
         history.deleteWorkout(id: id)
         save()

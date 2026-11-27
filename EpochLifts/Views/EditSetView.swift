@@ -36,7 +36,7 @@ struct EditSetView: View {
     let set = LoggedSet(reps: 8, weightLb: 135, completedAt: .now, repSource: .manual)
     let bench = LoggedExercise(exercise: ExerciseType.defaults[0], sets: [set])
     let storage = InMemoryWorkoutStorage(workouts: [Workout(startedAt: .now, exercises: [bench])])
-    let viewModel = WorkoutViewModel(storage: storage, repCounter: ManualRepCounter())
+    let viewModel = WorkoutViewModel(storage: storage, repCounter: ManualRepCounter(), restAlert: SilentRestAlert())
     viewModel.beginEdit(setID: set.id)
     return EditSetView(viewModel: viewModel)
 }
