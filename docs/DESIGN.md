@@ -28,10 +28,10 @@ Views → ViewModels → Services / Persistence → Models
 
 | Layer | Responsibility |
 |---|---|
-| Models | `Codable` data, the built-in exercise catalogue (`ExerciseType.defaults`), and pure logic on it (`Workout.duration`, `totalSets`) |
+| Models | `Codable` data, the built-in exercise catalogue (`ExerciseType.defaults`), pure logic on it (`Workout.duration`, `totalSets`), and the workout history rules (`WorkoutHistory`, ADR-011) |
 | Services | Rep counting |
 | Persistence | Saving and loading workouts behind a protocol |
-| ViewModels | Screen state, input validation, business rules, service calls; input parsing is in `SetInput` (ADR-011) |
+| ViewModels | Screen state, input validation, service calls; input parsing is in `SetInput` and history rules in `WorkoutHistory` (ADR-011) |
 | Views | Layout and display; forward user actions to the ViewModel |
 
 Dependencies point one way. Models do not know about services, services do not know about views, and ViewModels do not import SwiftUI.
@@ -244,7 +244,7 @@ struct RepEvent: Sendable {
 **Status:** Implemented
 
 **Decision:**
-- `WorkoutViewModel` lives in the app target: it is iPhone screen state, and the Watch will have its own. Pure logic it uses, such as `SetInput` (parsing the weight and reps boxes), lives in `WorkoutCore` so it is tested with `swift test`.
+- `WorkoutViewModel` lives in the app target: it is iPhone screen state, and the Watch will have its own. Pure logic it uses, `SetInput` (parsing the weight and reps boxes) and `WorkoutHistory` (the rules for changing the list of workouts), lives in `WorkoutCore` so it is tested with `swift test`.
 - Set flow: `beginSet` → `finishSet` → `completeSet` or `cancelSet`. `completeSet` passes the typed reps to `correctCount(to:)` and saves the counter's `count` (ADR-009), so there is no separate correction step.
 - Manual counters skip the lifting phase: there is nothing to count during the set, so `beginSet` goes straight to the weight and reps boxes. The ViewModel decides this from the counter's `sourceType`, never its concrete type.
 - Validation: weight is 0 or more (0 = bodyweight); reps are a whole number of 1 or more.
@@ -256,7 +256,7 @@ struct RepEvent: Sendable {
 
 **Alternatives:** ViewModel in `WorkoutCore` (faster tests, but iPhone state in the shared package and `public` everywhere); no pre-fill (simpler, but most sets repeat the last one); asking on launch whether to end an old workout (an extra prompt for a case with one sensible answer); Start and Finish for every source (one flow, but two extra taps per manual set for nothing).
 
-**Consequences:** ViewModel tests need the simulator. Reading `repEvents` live waits for the Watch counter in V0.2.
+**Consequences:** ViewModel tests need the simulator; the history rules they rely on are also tested on the Mac. Reading `repEvents` live waits for the Watch counter in V0.2.
 
 ADR-012 to 017 are proposed; see [ROADMAP.md](ROADMAP.md).
 
