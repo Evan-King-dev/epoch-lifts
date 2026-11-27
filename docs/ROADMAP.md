@@ -17,11 +17,10 @@ What comes next, and the design decisions proposed for it. Decisions already in 
 
 In order:
 
-1. Rest timer: starts automatically when a set is saved, notifies when done.
-2. Custom exercises: needs an ADR on IDs and storage when built.
-3. Workout templates: a named list of exercises; start a workout from one on the home screen; created with "Save as template" from a past workout, which keeps every exercise in order, duplicates included, with an edit screen later; the first set of each exercise pre-fills from the most recent set of that exercise in history (changes ADR-011's pre-fill rule when built).
-4. Exercise history: every past session of one exercise (one per workout, all copies' sets merged in `completedAt` order), "last time" shown inline while logging, PRs and estimated 1RM from individual sets grouped by `ExerciseType.id`; charts after styling starts.
-5. CSV/JSON export via the share sheet.
+1. Custom exercises: needs an ADR on IDs and storage when built.
+2. Workout templates: a named list of exercises; start a workout from one on the home screen; created with "Save as template" from a past workout, which keeps every exercise in order, duplicates included, with an edit screen later; the first set of each exercise pre-fills from the most recent set of that exercise in history (changes ADR-011's pre-fill rule when built); per-exercise rest durations that override the global one (ADR-018).
+3. Exercise history: every past session of one exercise (one per workout, all copies' sets merged in `completedAt` order), "last time" shown inline while logging, PRs and estimated 1RM from individual sets grouped by `ExerciseType.id`; charts after styling starts.
+4. CSV/JSON export via the share sheet.
 
 Later: exercise search and filter, notes, plate calculator, Apple Health export with V0.2.
 
@@ -35,6 +34,7 @@ Later: exercise search and filter, notes, plate calculator, Apple Health export 
 - Live rep counts on the iPhone and range-of-motion validation.
 - Optional: a live raw motion graph.
 - The Watch starts with Start/Finish buttons; automatic set start and end is a later option, and button-marked sets become its training data.
+- Rest timer on the Watch: avoid a double alert (the mirrored phone notification plus a Watch haptic), and decide whether `beginSet` from the Watch stops the rest, since Watch Start is pressed before lifting.
 
 ### V0.3: Feedback and ML
 
@@ -47,7 +47,7 @@ Later: exercise search and filter, notes, plate calculator, Apple Health export 
 
 ## Proposed decisions
 
-These continue the numbering of ADR-001 to 011 in DESIGN.md.
+These continue the numbering of ADR-001 to 011 in DESIGN.md; ADR-018 is in effect there.
 
 ### ADR-012: Rep detection on the Watch
 
