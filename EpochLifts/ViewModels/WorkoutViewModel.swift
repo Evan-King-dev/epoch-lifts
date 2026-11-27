@@ -30,8 +30,13 @@ final class WorkoutViewModel {
         }
     }
 
+    /// Every workout and the rules for changing them (ADR-011).
+    private var history = WorkoutHistory()
+
     /// All workouts, oldest first. The active workout, if any, is the last one.
-    private(set) var workouts: [Workout] = []
+    var workouts: [Workout] {
+        history.workouts
+    }
 
     private(set) var setPhase: SetPhase = .notStarted
 
@@ -63,17 +68,17 @@ final class WorkoutViewModel {
 
     /// The workout in progress, if any.
     var activeWorkout: Workout? {
-        activeWorkoutIndex.map { workouts[$0] }
+        history.activeWorkout
     }
 
     /// True when no workout is in progress, so a new one can be started.
     var canStartWorkout: Bool {
-        activeWorkoutIndex == nil
+        history.canStartWorkout
     }
 
     /// True when the workout in progress has no saved sets, so ending it deletes it.
     var isActiveWorkoutEmpty: Bool {
-        activeWorkout?.totalSets == 0
+        history.isActiveWorkoutEmpty
     }
 
     /// True while a set has been started but not yet saved or cancelled.
@@ -83,17 +88,16 @@ final class WorkoutViewModel {
 
     /// The workout with this ID, or `nil` if it no longer exists.
     func workout(id: UUID) -> Workout? {
-        workouts.first { $0.id == id }
+        history.workout(id: id)
     }
 
     /// Ended workouts, newest first, for the history list.
     var pastWorkouts: [Workout] {
-        workouts.filter { !$0.isActive }.sorted { $0.startedAt > $1.startedAt }
+        history.pastWorkouts
     }
 
-    /// How long after its last activity an active workout counts as forgotten. The reason
-    /// for four hours is in ADR-011.
-    static let forgottenWorkoutCutoff: TimeInterval = 4 * 60 * 60
+    /// How long after its last activity an active workout counts as forgotten (ADR-011).
+    static let forgottenWorkoutCutoff = WorkoutHistory.forgottenWorkoutCutoff
 
     private static let invalidWeightMessage = "Enter a weight of 0 or more (0 means bodyweight)."
     private static let invalidRepsMessage = "Enter reps as a whole number, 1 or more."
@@ -120,7 +124,7 @@ final class WorkoutViewModel {
         self.now = now
 
         do {
-            workouts = try storage.loadWorkouts()
+            history = WorkoutHistory(workouts: try storage.loadWorkouts())
         } catch {
             logger.error("Loading workouts failed: \(String(describing: error), privacy: .public)")
             canSave = false
@@ -134,27 +138,26 @@ final class WorkoutViewModel {
 
     /// Starts a new workout. Does nothing if one is already in progress.
     func startWorkout() {
-        guard activeWorkoutIndex == nil else { return }
-        workouts.append(Workout(startedAt: now()))
+        guard history.start(at: now()) else { return }
         save()
     }
 
     /// Ends the workout in progress. An unfinished set is discarded. A workout with no
     /// sets is deleted instead of being kept in history.
     func endWorkout() {
-        endActiveWorkout(at: now())
+        guard history.end(at: now()) else { return }
+        cancelSet()
+        save()
     }
 
     /// Adds an exercise to the workout in progress. With a manual counter, also opens its
     /// first set's weight and reps boxes, unless another set is in progress (ADR-011).
     func addExercise(_ exerciseType: ExerciseType) {
-        guard let workoutIndex = activeWorkoutIndex else { return }
-        let exercise = LoggedExercise(exercise: exerciseType)
-        workouts[workoutIndex].exercises.append(exercise)
+        guard let exerciseID = history.addExercise(exerciseType) else { return }
         save()
 
         if repCounter.sourceType == .manual {
-            beginSet(for: exercise.id)
+            beginSet(for: exerciseID)
         }
     }
 
@@ -163,11 +166,10 @@ final class WorkoutViewModel {
     /// Runs after a successful load and whenever the app becomes active, since the app may
     /// stay in memory for days. On launch it runs twice; the second run finds nothing to end.
     func endForgottenWorkout() {
-        guard let lastActivityAt = activeWorkout?.lastActivityAt,
-              now().timeIntervalSince(lastActivityAt) > Self.forgottenWorkoutCutoff
-        else { return }
-        logger.info("Ending a forgotten workout at its last activity")
-        endActiveWorkout(at: lastActivityAt)
+        guard history.endForgottenWorkout(now: now()) else { return }
+        logger.info("Ended a forgotten workout at its last activity")
+        cancelSet()
+        save()
     }
 
     // MARK: - Sets
@@ -180,10 +182,10 @@ final class WorkoutViewModel {
     /// entering weight and reps (ADR-011), with both boxes pre-filled.
     func beginSet(for exerciseID: UUID) {
         guard setPhase == .notStarted,
-              let exercise = loggedExercise(id: exerciseID)
+              history.activeExercise(id: exerciseID) != nil
         else { return }
 
-        weightText = latestSet(of: exercise.exercise).map { SetInput.text(forWeightLb: $0.weightLb) } ?? ""
+        weightText = history.latestSet(forExerciseID: exerciseID).map { SetInput.text(forWeightLb: $0.weightLb) } ?? ""
         repsText = ""
         inputErrorMessage = nil
 
@@ -205,8 +207,7 @@ final class WorkoutViewModel {
 
         if repCounter.count > 0 {
             repsText = String(repCounter.count)
-        } else if let exercise = loggedExercise(id: exerciseID),
-                  let previousSet = latestSet(of: exercise.exercise) {
+        } else if let previousSet = history.latestSet(forExerciseID: exerciseID) {
             repsText = String(previousSet.reps)
         } else {
             repsText = ""
@@ -227,9 +228,7 @@ final class WorkoutViewModel {
             inputErrorMessage = Self.invalidRepsMessage
             return
         }
-        guard let workoutIndex = activeWorkoutIndex,
-              let exerciseIndex = workouts[workoutIndex].exercises.firstIndex(where: { $0.id == exerciseID })
-        else {
+        guard history.activeExercise(id: exerciseID) != nil else {
             cancelSet()
             return
         }
@@ -241,7 +240,10 @@ final class WorkoutViewModel {
             completedAt: now(),
             repSource: repCounter.sourceType
         )
-        workouts[workoutIndex].exercises[exerciseIndex].sets.append(set)
+        guard history.addSet(set, toExerciseID: exerciseID) else {
+            cancelSet()
+            return
+        }
         save()
         clearSet()
     }
@@ -257,8 +259,7 @@ final class WorkoutViewModel {
 
     /// The saved set being edited, or `nil` when no edit is open or the set no longer exists.
     var editingSet: LoggedSet? {
-        guard let setID = editingSetID, let position = findSet(id: setID) else { return nil }
-        return workouts[position.workoutIndex].exercises[position.exerciseIndex].sets[position.setIndex]
+        editingSetID.flatMap { history.loggedSet(id: $0) }
     }
 
     /// Opens an edit of a saved set in any workout, filling the edit boxes from it.
@@ -267,8 +268,7 @@ final class WorkoutViewModel {
     /// Edits change the saved set directly, without the rep counter, so they never affect
     /// the set being logged (ADR-011).
     func beginEdit(setID: UUID) {
-        guard let position = findSet(id: setID) else { return }
-        let set = workouts[position.workoutIndex].exercises[position.exerciseIndex].sets[position.setIndex]
+        guard let set = history.loggedSet(id: setID) else { return }
         editingSetID = setID
         editWeightText = SetInput.text(forWeightLb: set.weightLb)
         editRepsText = String(set.reps)
@@ -280,7 +280,7 @@ final class WorkoutViewModel {
     /// while editing, the edit closes without changing or saving anything.
     func saveEdit() {
         guard let setID = editingSetID else { return }
-        guard let position = findSet(id: setID) else {
+        guard history.loggedSet(id: setID) != nil else {
             cancelEdit()
             return
         }
@@ -293,8 +293,7 @@ final class WorkoutViewModel {
             return
         }
 
-        workouts[position.workoutIndex].exercises[position.exerciseIndex].sets[position.setIndex].weightLb = weightLb
-        workouts[position.workoutIndex].exercises[position.exerciseIndex].sets[position.setIndex].reps = reps
+        history.editSet(id: setID, weightLb: weightLb, reps: reps)
         save()
         cancelEdit()
     }
@@ -314,7 +313,7 @@ final class WorkoutViewModel {
         if activeWorkout?.id == id {
             cancelSet()
         }
-        workouts.removeAll { $0.id == id }
+        history.deleteWorkout(id: id)
         save()
     }
 
@@ -324,72 +323,18 @@ final class WorkoutViewModel {
         if setPhase.exerciseID == id {
             cancelSet()
         }
-        for workoutIndex in workouts.indices {
-            workouts[workoutIndex].exercises.removeAll { $0.id == id }
-        }
-        removeEmptyEndedWorkouts()
+        history.deleteExercise(id: id)
         save()
     }
 
     /// Deletes a single set from whichever exercise contains it. An ended workout left
     /// with no sets is deleted too.
     func deleteSet(id: UUID) {
-        for workoutIndex in workouts.indices {
-            for exerciseIndex in workouts[workoutIndex].exercises.indices {
-                workouts[workoutIndex].exercises[exerciseIndex].sets.removeAll { $0.id == id }
-            }
-        }
-        removeEmptyEndedWorkouts()
+        history.deleteSet(id: id)
         save()
     }
 
     // MARK: - Private
-
-    /// Ends the workout in progress at `date`: discards an unfinished set, deletes the
-    /// workout if it has no sets, and saves.
-    private func endActiveWorkout(at date: Date) {
-        guard let workoutIndex = activeWorkoutIndex else { return }
-        cancelSet()
-        workouts[workoutIndex].endedAt = date
-        removeEmptyEndedWorkouts()
-        save()
-    }
-
-    /// Deletes ended workouts that have no sets, so history never holds an empty entry.
-    /// The workout in progress is never deleted here (ADR-011).
-    private func removeEmptyEndedWorkouts() {
-        workouts.removeAll { !$0.isActive && $0.totalSets == 0 }
-    }
-
-    private var activeWorkoutIndex: Int? {
-        workouts.lastIndex(where: \.isActive)
-    }
-
-    private func loggedExercise(id: UUID) -> LoggedExercise? {
-        activeWorkout?.exercises.first { $0.id == id }
-    }
-
-    /// The most recent set, by completion time, of this exercise type in the workout in
-    /// progress, across every copy of the exercise. Matches on the type's stable ID, so a
-    /// renamed copy still counts. Used to pre-fill the weight and reps boxes (ADR-011).
-    private func latestSet(of exerciseType: ExerciseType) -> LoggedSet? {
-        activeWorkout?.exercises
-            .filter { $0.exercise.id == exerciseType.id }
-            .flatMap(\.sets)
-            .max { $0.completedAt < $1.completedAt }
-    }
-
-    /// Where the saved set with this ID is, in any workout, or `nil` if it doesn't exist.
-    private func findSet(id: UUID) -> (workoutIndex: Int, exerciseIndex: Int, setIndex: Int)? {
-        for workoutIndex in workouts.indices {
-            for exerciseIndex in workouts[workoutIndex].exercises.indices {
-                if let setIndex = workouts[workoutIndex].exercises[exerciseIndex].sets.firstIndex(where: { $0.id == id }) {
-                    return (workoutIndex, exerciseIndex, setIndex)
-                }
-            }
-        }
-        return nil
-    }
 
     /// Resets the counter and the input boxes after a set is saved or cancelled.
     private func clearSet() {

@@ -197,6 +197,18 @@ struct WorkoutViewModelTests {
         #expect(viewModel.workouts.last?.endedAt == lastSetDate)
     }
 
+    @Test func forgottenCheckOnRecentWorkoutDoesNotSave() {
+        let storage = FailingWorkoutStorage()
+        let viewModel = makeViewModel(storage: storage)
+        viewModel.startWorkout()
+        let savesBefore = storage.saveCallCount
+
+        viewModel.endForgottenWorkout()
+
+        #expect(viewModel.activeWorkout != nil)
+        #expect(storage.saveCallCount == savesBefore)
+    }
+
     // MARK: - Workouts
 
     @Test func startWorkoutCreatesActiveWorkoutAndSaves() throws {
@@ -215,6 +227,19 @@ struct WorkoutViewModelTests {
         viewModel.startWorkout()
         viewModel.startWorkout()
         #expect(viewModel.workouts.count == 1)
+    }
+
+    @Test func startOrEndThatChangesNothingDoesNotSave() {
+        let storage = FailingWorkoutStorage()
+        let viewModel = makeViewModel(storage: storage)
+
+        viewModel.endWorkout()
+        #expect(storage.saveCallCount == 0)
+
+        viewModel.startWorkout()
+        let savesAfterStart = storage.saveCallCount
+        viewModel.startWorkout()
+        #expect(storage.saveCallCount == savesAfterStart)
     }
 
     @Test func canStartWorkoutOnlyWhenNoneIsActive() {
