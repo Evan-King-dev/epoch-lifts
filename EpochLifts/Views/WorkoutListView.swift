@@ -82,10 +82,10 @@ struct WorkoutListView: View {
         ]
     )
     let storage = InMemoryWorkoutStorage(workouts: [pastWorkout])
-    WorkoutListView(viewModel: WorkoutViewModel(storage: storage, repCounter: ManualRepCounter()))
+    WorkoutListView(viewModel: WorkoutViewModel(storage: storage, repCounter: ManualRepCounter(), restAlert: SilentRestAlert()))
 }
 
 #Preview("Workout in progress") {
     let storage = InMemoryWorkoutStorage(workouts: [Workout(startedAt: .now)])
-    WorkoutListView(viewModel: WorkoutViewModel(storage: storage, repCounter: ManualRepCounter()))
+    WorkoutListView(viewModel: WorkoutViewModel(storage: storage, repCounter: ManualRepCounter(), restAlert: SilentRestAlert()))
 }

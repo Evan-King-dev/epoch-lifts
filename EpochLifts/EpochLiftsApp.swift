@@ -22,7 +22,8 @@ import WorkoutCore
     /// Files app never shows (ADR-008). Changing it would hide existing history.
     static let defaultStorageFolder: URL = .applicationSupportDirectory
 
-    /// Builds the ViewModel with file storage and manual rep counting (ADR-009, ADR-008).
+    /// Builds the ViewModel with file storage, manual rep counting and notification rest
+    /// alerts (ADR-008, ADR-009, ADR-018).
     ///
     /// - Parameter storageFolder: The folder that holds `workouts.json`. Tests pass a
     ///   temporary folder. Changing the folder or the file name would hide existing history.
@@ -30,6 +31,10 @@ import WorkoutCore
         storageFolder: URL = EpochLiftsApp.defaultStorageFolder
     ) -> WorkoutViewModel {
         let storage = FileWorkoutStorage(fileURL: storageFolder.appending(path: "workouts.json"))
-        return WorkoutViewModel(storage: storage, repCounter: ManualRepCounter())
+        return WorkoutViewModel(
+            storage: storage,
+            repCounter: ManualRepCounter(),
+            restAlert: NotificationRestAlert()
+        )
     }
 }

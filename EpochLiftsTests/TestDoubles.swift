@@ -74,3 +74,31 @@ final class TestClock {
         self.now = now
     }
 }
+
+/// A rest alert for tests. Records every call instead of alerting.
+@MainActor
+final class FakeRestAlert: RestAlert {
+    /// A method call the ViewModel made on the alert.
+    enum Call: Equatable {
+        case schedule(Date)
+        case cancel
+    }
+
+    private(set) var calls: [Call] = []
+
+    func schedule(at date: Date) {
+        calls.append(.schedule(date))
+    }
+
+    func cancel() {
+        calls.append(.cancel)
+    }
+}
+
+/// An empty settings store for one test, so tests never read or change the app's own settings.
+func makeTestSettings() -> UserDefaults {
+    let name = "EpochLiftsTests-\(UUID().uuidString)"
+    let settings = UserDefaults(suiteName: name)!
+    settings.removePersistentDomain(forName: name)
+    return settings
+}

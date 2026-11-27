@@ -9,12 +9,22 @@ struct WorkoutViewModelTests {
     let fixedDate = Date(timeIntervalSince1970: 1_800_000_000)
     let bench = ExerciseType.defaults[0]
 
+    /// - Parameter now: The current time. Defaults to `fixedDate`; pass a `TestClock` to move it.
     func makeViewModel(
         storage: any WorkoutStorage = InMemoryWorkoutStorage(),
-        counter: FakeRepCounter = FakeRepCounter()
+        counter: FakeRepCounter = FakeRepCounter(),
+        restAlert: FakeRestAlert = FakeRestAlert(),
+        settings: UserDefaults = makeTestSettings(),
+        now: (() -> Date)? = nil
     ) -> WorkoutViewModel {
         let date = fixedDate
-        return WorkoutViewModel(storage: storage, repCounter: counter, now: { date })
+        return WorkoutViewModel(
+            storage: storage,
+            repCounter: counter,
+            restAlert: restAlert,
+            settings: settings,
+            now: now ?? { date }
+        )
     }
 
     /// Starts a workout, adds bench press, and returns the new exercise's ID.
@@ -152,7 +162,7 @@ struct WorkoutViewModelTests {
     @Test func workoutThatBecomesForgottenAfterLoadEndsWhenCheckedAgain() throws {
         let clock = TestClock(now: fixedDate)
         let storage = InMemoryWorkoutStorage()
-        let viewModel = WorkoutViewModel(storage: storage, repCounter: FakeRepCounter(), now: { clock.now })
+        let viewModel = makeViewModel(storage: storage, now: { clock.now })
         let exerciseID = try startWorkoutWithBench(viewModel)
         logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
 
@@ -169,7 +179,7 @@ struct WorkoutViewModelTests {
 
     @Test func endingForgottenWorkoutDiscardsUnfinishedSet() throws {
         let clock = TestClock(now: fixedDate)
-        let viewModel = WorkoutViewModel(storage: InMemoryWorkoutStorage(), repCounter: FakeRepCounter(), now: { clock.now })
+        let viewModel = makeViewModel(storage: InMemoryWorkoutStorage(), now: { clock.now })
         let exerciseID = try startWorkoutWithBench(viewModel)
         logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
         viewModel.beginSet(for: exerciseID)
@@ -913,7 +923,7 @@ struct WorkoutViewModelTests {
 
     @Test func editDoesNotKeepForgottenWorkoutAlive() throws {
         let clock = TestClock(now: fixedDate)
-        let viewModel = WorkoutViewModel(storage: InMemoryWorkoutStorage(), repCounter: FakeRepCounter(), now: { clock.now })
+        let viewModel = makeViewModel(storage: InMemoryWorkoutStorage(), now: { clock.now })
         let setID = try logOneBenchSet(viewModel)
 
         clock.now = fixedDate.addingTimeInterval(cutoff - 60)
@@ -1050,5 +1060,171 @@ struct WorkoutViewModelTests {
 
         #expect(reloaded.workouts == viewModel.workouts)
         #expect(reloaded.activeWorkout?.totalSets == 1)
+    }
+
+    // MARK: - Rest timer
+
+    @Test func restDurationDefaultsToTwoMinutes() {
+        #expect(makeViewModel().restDuration == RestTimer.defaultDuration)
+    }
+
+    @Test func savingSetStartsRestAndSchedulesAlert() throws {
+        let alert = FakeRestAlert()
+        let viewModel = makeViewModel(restAlert: alert)
+        let exerciseID = try startWorkoutWithBench(viewModel)
+
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
+
+        let endsAt = fixedDate.addingTimeInterval(RestTimer.defaultDuration)
+        #expect(viewModel.restTimer.endsAt == endsAt)
+        #expect(alert.calls == [.schedule(endsAt)])
+    }
+
+    @Test func invalidSetDoesNotStartRest() throws {
+        let alert = FakeRestAlert()
+        let viewModel = makeViewModel(restAlert: alert)
+        let exerciseID = try startWorkoutWithBench(viewModel)
+
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "0")
+
+        #expect(viewModel.restTimer.endsAt == nil)
+        #expect(alert.calls.isEmpty)
+    }
+
+    @Test func restUsesChosenDuration() throws {
+        let viewModel = makeViewModel()
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        viewModel.restDuration = 90
+
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
+
+        #expect(viewModel.restTimer.endsAt == fixedDate.addingTimeInterval(90))
+    }
+
+    @Test func chosenDurationIsKeptAfterReload() {
+        let settings = makeTestSettings()
+        makeViewModel(settings: settings).restDuration = 180
+
+        #expect(makeViewModel(settings: settings).restDuration == 180)
+    }
+
+    @Test func savedDurationOutOfRangeIsClamped() {
+        let settings = makeTestSettings()
+        settings.set(5000.0, forKey: WorkoutViewModel.restDurationKey)
+
+        #expect(makeViewModel(settings: settings).restDuration == RestTimer.durationRange.upperBound)
+    }
+
+    @Test func changingDurationKeepsRunningRest() throws {
+        let alert = FakeRestAlert()
+        let viewModel = makeViewModel(restAlert: alert)
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
+
+        viewModel.restDuration = 60
+
+        #expect(viewModel.restTimer.endsAt == fixedDate.addingTimeInterval(RestTimer.defaultDuration))
+        #expect(alert.calls.count == 1)
+    }
+
+    @Test func nextSavedSetRestartsRest() throws {
+        let clock = TestClock(now: fixedDate)
+        let alert = FakeRestAlert()
+        let viewModel = makeViewModel(restAlert: alert, now: { clock.now })
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
+
+        clock.now = fixedDate.addingTimeInterval(150)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
+
+        let secondEnd = clock.now.addingTimeInterval(RestTimer.defaultDuration)
+        #expect(viewModel.restTimer.endsAt == secondEnd)
+        #expect(alert.calls.last == .schedule(secondEnd))
+    }
+
+    @Test func openingNextSetKeepsRest() throws {
+        let alert = FakeRestAlert()
+        let viewModel = makeViewModel(restAlert: alert)
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
+
+        viewModel.beginSet(for: exerciseID)
+        viewModel.cancelSet()
+
+        #expect(viewModel.restTimer.endsAt != nil)
+        #expect(alert.calls.count == 1)
+    }
+
+    @Test func skipRestStopsRestAndCancelsAlert() throws {
+        let alert = FakeRestAlert()
+        let viewModel = makeViewModel(restAlert: alert)
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
+
+        viewModel.skipRest()
+
+        #expect(viewModel.restTimer.endsAt == nil)
+        #expect(alert.calls.last == .cancel)
+    }
+
+    @Test func skipRestWithNoRestDoesNothing() {
+        let alert = FakeRestAlert()
+        let viewModel = makeViewModel(restAlert: alert)
+
+        viewModel.skipRest()
+
+        #expect(alert.calls.isEmpty)
+    }
+
+    @Test func endingWorkoutStopsRest() throws {
+        let alert = FakeRestAlert()
+        let viewModel = makeViewModel(restAlert: alert)
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
+
+        viewModel.endWorkout()
+
+        #expect(viewModel.restTimer.endsAt == nil)
+        #expect(alert.calls.last == .cancel)
+    }
+
+    @Test func endingForgottenWorkoutStopsRest() throws {
+        let clock = TestClock(now: fixedDate)
+        let alert = FakeRestAlert()
+        let viewModel = makeViewModel(restAlert: alert, now: { clock.now })
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
+
+        clock.now = fixedDate.addingTimeInterval(cutoff + 1)
+        viewModel.endForgottenWorkout()
+
+        #expect(viewModel.restTimer.endsAt == nil)
+        #expect(alert.calls.last == .cancel)
+    }
+
+    @Test func deletingActiveWorkoutStopsRest() throws {
+        let alert = FakeRestAlert()
+        let viewModel = makeViewModel(restAlert: alert)
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
+        let workoutID = try #require(viewModel.activeWorkout?.id)
+
+        viewModel.deleteWorkout(id: workoutID)
+
+        #expect(viewModel.restTimer.endsAt == nil)
+        #expect(alert.calls.last == .cancel)
+    }
+
+    @Test func deletingSavedSetKeepsRest() throws {
+        let alert = FakeRestAlert()
+        let viewModel = makeViewModel(restAlert: alert)
+        let exerciseID = try startWorkoutWithBench(viewModel)
+        logSet(viewModel, exerciseID: exerciseID, weight: "135", reps: "5")
+        let setID = try #require(viewModel.activeWorkout?.exercises.first?.sets.first?.id)
+
+        viewModel.deleteSet(id: setID)
+
+        #expect(viewModel.restTimer.endsAt != nil)
+        #expect(alert.calls.count == 1)
     }
 }

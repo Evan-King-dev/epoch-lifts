@@ -19,6 +19,7 @@ struct ActiveWorkoutView: View {
             if let workout = viewModel.activeWorkout {
                 Section {
                     WorkoutTimerView(workout: workout)
+                    RestTimerView(viewModel: viewModel)
                 }
 
                 ForEach(workout.exercises) { exercise in
@@ -94,6 +95,6 @@ struct ActiveWorkoutView: View {
     )
     let storage = InMemoryWorkoutStorage(workouts: [Workout(startedAt: .now, exercises: [bench])])
     NavigationStack {
-        ActiveWorkoutView(viewModel: WorkoutViewModel(storage: storage, repCounter: ManualRepCounter()))
+        ActiveWorkoutView(viewModel: WorkoutViewModel(storage: storage, repCounter: ManualRepCounter(), restAlert: SilentRestAlert()))
     }
 }
