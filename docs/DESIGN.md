@@ -123,6 +123,7 @@ Dependencies are passed in through `init`. Real implementations are created in o
 
 **Decision:**
 - Built-in exercises are defined in `ExerciseType.defaults` with fixed string IDs such as `"bench-press"`. IDs generated at launch would break history grouping and per-exercise ML templates.
+- From the first device install, built-in exercise IDs are add-only: never removed or renamed. Saved sets reference these IDs, and a renamed ID splits that exercise's history in two.
 - Weights are stored in pounds, exactly as entered (`weightLb`). Local gyms use pound plates, and storing kilograms would turn entered values like 225 lb into 102.058… kg, with rounding errors when converted back for display.
 - Physics and ML code that needs kilograms converts with a single `weightKg` property (`weightLb × 0.45359237`), added when first needed in V0.3. Rep detection does not use weight.
 - Time and sensor data use SI units (seconds, m/s²).
